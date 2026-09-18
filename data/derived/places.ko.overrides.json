@@ -1,0 +1,632 @@
+{
+ "a033373": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Mattanah",
+  "evidence": "Num.21.18 …귀인들이 홀과 지팡이로 판 것이로다 하였더라 광야에서 맛다나에 이르렀고",
+  "ko": "맛다나",
+  "note": "Mattanah. auto `맛다나에` — 조사가 붙은 채 확정됐다",
+  "was": "맛다나에"
+ },
+ "a0574da": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Iye-abarim",
+  "evidence": "Num.21.11 오봇에서 진행하여 모압 앞 해 돋는 편 광야 이예아바림에 진 쳤고",
+  "ko": "이예아바림",
+  "note": "Iye-abarim. auto `이예아바림에` — 조사가 붙은 채 확정됐다",
+  "was": "이예아바림에"
+ },
+ "a0a2ca7": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Assos",
+  "evidence": "Acts.20.13 우리는 앞서 배를 타고 앗소에서 바울을 태우려고 그리로 행선하니 이는 자기가 도보…",
+  "ko": "앗소",
+  "note": "Assos. auto `앗소에서` — 조사가 붙은 채 확정됐다",
+  "was": "앗소에서"
+ },
+ "a0e11c1": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Telassar",
+  "evidence": "2Kgs.19.12 내 열조가 멸하신 열방 곧 고산과 하란과 레셉과 들라살에 있는 에덴 족속을 그 나라의 신들이 건졌느냐",
+  "ko": "들라살",
+  "note": "Telassar. auto `들라살에` — 조사가 붙은 채 확정됐다",
+  "was": "들라살에"
+ },
+ "a0ef1e1": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Oboth",
+  "evidence": "Num.21.10 이스라엘 자손이 진행하여 오봇에 진 쳤고",
+  "ko": "오봇",
+  "note": "Oboth. auto `오봇에` — 조사가 붙은 채 확정됐다",
+  "was": "오봇에"
+ },
+ "a0fe2be": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Bene-jaakan",
+  "evidence": "Num.33.31 모세롯에서 발행하여 브네야아간에 진 쳤고",
+  "ko": "브네야아간",
+  "note": "Bene-jaakan. auto `브네야아간에` — 조사가 붙은 채 확정됐다",
+  "was": "브네야아간에"
+ },
+ "a121d5e": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Forum of Appius",
+  "evidence": "Acts.28.15 거기 형제들이 우리 소식을 듣고 압비오 저자와 삼관까지 맞으러 오니 바울이 저희를 보고 하나님께 …",
+  "ko": "압비오 저자",
+  "note": "Forum of Appius. auto `삼관까지`(Three Taverns 와 혼동). 개역한글은 `압비오 저자`",
+  "was": "삼관까지"
+ },
+ "a149f13": {
+  "cat": "add",
+  "conf": 1.0,
+  "en": "Judea 1",
+  "evidence": "Acts.28.21 저희가 가로되 우리가 유대에서 네게 대한 편지도 받은 일이 없고 또 형제 중 누…",
+  "ko": "유대",
+  "note": "Judea. ko 는 맞는데 auto conf 0.518. `유대인`과 접두어가 같아 눌렸다. 행 28:21 등 44개 span 이 정확하고 7개가 `유대인` 안에 걸린다",
+  "was": "유대"
+ },
+ "a19fd03": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Lycia",
+  "evidence": "Acts.27.5 길리기아와 밤빌리아 바다를 건너 루기아의 무라성에 이르러",
+  "ko": "루기아",
+  "note": "Lycia. auto 는 같은 절의 `무라성에`(Myra)를 집었다",
+  "was": "무라성에"
+ },
+ "a1c6a50": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Zalmonah",
+  "evidence": "Num.33.41 그들이 호르산에서 발행하여 살모나에 진 쳤고",
+  "ko": "살모나",
+  "note": "Zalmonah. auto `살모나에` — 조사가 붙은 채 확정됐다",
+  "was": "살모나에"
+ },
+ "a1cb244": {
+  "cat": "fix",
+  "conf": 1.0,
+  "decision": "Snow 2026-09-18 되돌림 — 창 12:9 '점점 남방으로'가 이 도구가 도와야 할 자리. OpenBible 구절 목록이 방위 용법을 이미 걸러줌",
+  "en": "Negeb",
+  "evidence": "Gen.12.9 점점 남방으로 옮겨 갔더라",
+  "ko": "남방",
+  "note": "Negeb. 개역한글은 고유명사로 옮기지 않고 방위 일반명사 `남방`으로 옮겼다. 같은 말이 지명이 아닌 자리에도 쓰인다(대상 26:15 `남방에 당첨되었고`, 대하 4:10 `동남방에`). 규칙대로 밑줄 금지. — Snow 판단 필요",
+  "was": "남방"
+ },
+ "a1e3697": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Syracuse",
+  "evidence": "Acts.28.12 수라구사에 대고 사흘을 있다가",
+  "ko": "수라구사",
+  "note": "Syracuse. auto `수라구사에`",
+  "was": "수라구사에"
+ },
+ "a2410c1": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Elim",
+  "evidence": "Exod.15.27 그들이 엘림에 이르니 거기 물샘 열 둘과 종려 칠십주가 있는지라 …",
+  "ko": "엘림",
+  "note": "Elim. auto `엘림에` — 조사가 붙은 채 확정됐다",
+  "was": "엘림에"
+ },
+ "a280f83": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Beeroth Bene-jaakan",
+  "evidence": "Deut.10.6 (이스라엘 자손이 브에롯 브네야아간에서 발행하여 모세라에 이르러서는 아론이 거기서 죽고 …",
+  "ko": "브에롯 브네야아간",
+  "note": "Beeroth Bene-jaakan. auto `브네야아간에` — 조사가 붙은 채 확정됐다",
+  "was": "브네야아간에"
+ },
+ "a2e73ba": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Rithmah",
+  "evidence": "Num.33.18 하세롯에서 발행하여 릿마에 진 쳤고",
+  "ko": "릿마",
+  "note": "Rithmah. auto `릿마에` — 조사가 붙은 채 확정됐다",
+  "was": "릿마에"
+ },
+ "a2e7601": {
+  "cat": "add",
+  "conf": 1.0,
+  "en": "Cyprus",
+  "evidence": "Acts.27.4 또 거기서 우리가 떠나가다가 바람의 거스림을 피하여 구브로 해안을 의지하고 행선하여",
+  "ko": "구브로",
+  "note": "Cyprus. ko 는 맞는데 auto conf 0.588 < 0.6 로 빠졌다",
+  "was": "구브로"
+ },
+ "a314765": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Paphos",
+  "evidence": "Acts.13.6 온 섬 가운데로 지나서 바보에 이르러 바예수라 하는 유대인 거짓 선지자 박수를 만…",
+  "ko": "바보",
+  "note": "Paphos. auto `바보에` — 조사가 붙은 채 확정됐다",
+  "was": "바보에"
+ },
+ "a32397f": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Alush",
+  "evidence": "Num.33.13 돕가에 진 쳤고 돕가에서 발행하여 알루스에 진 쳤고",
+  "ko": "알루스",
+  "note": "Alush. auto `알루스에` — 조사가 붙은 채 확정됐다",
+  "was": "알루스에"
+ },
+ "a32d25a": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Kehelathah",
+  "evidence": "Num.33.22 릿사에서 발행하여 그헬라다에 진 쳤고",
+  "ko": "그헬라다",
+  "note": "Kehelathah. auto `그헬라다에` — 조사가 붙은 채 확정됐다",
+  "was": "그헬라다에"
+ },
+ "a37c8e6": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Valley of Hinnom",
+  "evidence": "Josh.15.8 또 힌놈의 아들의 골짜기로 올라가서 여부스 곧 예루살렘 남편 …",
+  "ko": "힌놈",
+  "note": "Valley of Hinnom. auto `힌놈의` — 조사가 붙은 채 확정됐다",
+  "was": "힌놈의"
+ },
+ "a39fe14": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Mount Shepher",
+  "evidence": "Num.33.23 그헬라다에서 발행하여 세벨산에 진 쳤고",
+  "ko": "세벨산",
+  "note": "Mount Shepher. auto `세벨산에` — 조사가 붙은 채 확정됐다",
+  "was": "세벨산에"
+ },
+ "a4488e9": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Puteoli",
+  "evidence": "Acts.28.13 …온에 이르러 하루를 지난 후 남풍이 일어나므로 이튿날 보디올에 이르러",
+  "ko": "보디올",
+  "note": "Puteoli. auto `일어나므로` — 같은 절의 아무 토큰",
+  "was": "일어나므로"
+ },
+ "a49c017": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Harosheth-hagoyim",
+  "evidence": "Judg.4.2 …왕 야빈의 손에 그들을 파셨는데 그 군대 장관은 이방 하로셋에 거하는 시스라요",
+  "ko": "하로셋",
+  "note": "Harosheth-hagoyim. auto `하로셋에` — 조사가 붙은 채 확정됐다",
+  "was": "하로셋에"
+ },
+ "a513646": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Dan",
+  "evidence": "Gen.14.14 …고 집에서 길리고 연습한 자 삼백 십 팔인을 거느리고 단까지 쫓아가서",
+  "ko": "단",
+  "note": "Dan. auto `브엘세바` — 같은 절의 다른 지명을 집은 명백한 오답. 1음절이지만 구절 목록 안에서 26개 span 중 21개가 정확하다. 남는 결함: 겔 27:19 `워단` 안에 걸리고, 수 19:47·삿 18:27 의 `단 자손`(지파)에도 걸린다",
+  "was": "브엘세바"
+ },
+ "a55027d": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Miletus",
+  "evidence": "Acts.20.15 …오 앞에 오고 그 이튿날 사모에 들리고 또 그 다음날 밀레도에 이르니라",
+  "ko": "밀레도",
+  "note": "Miletus. auto `밀레도에` — 조사가 붙은 채 확정됐다",
+  "was": "밀레도에"
+ },
+ "a562fcc": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Sea of Galilee",
+  "evidence": "Num.34.11 …서 리블라로 내려가서 아인 동편에 이르고 또 내려가서 긴네렛 동편 해변에 미치고",
+  "ko": "긴네렛",
+  "note": "Sea of Galilee. auto `긴네`(접두어 절단). 개역한글은 한 이름으로 부르지 않는다 — `긴네렛`(민 34:11, 수 13:27) / `긴네롯 바다`(수 12:3) / `갈릴리 바다·호수·해변`(신약) / `디베랴 바다`. 한 장소에 ko 하나만 둘 수 있어 구약 표기를 택했다 — Snow 판단 필요",
+  "was": "긴네"
+ },
+ "a56788c": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Lasea",
+  "evidence": "Acts.27.8 간신히 그 연안을 지나 미항이라는 곳에 이르니 라새아성에서 가깝더라",
+  "ko": "라새아성",
+  "note": "Lasea. auto `라새아성에서`. `라새아` 단독형은 본문에 없어 `성`까지 이름으로 둔다",
+  "was": "라새아성에서"
+ },
+ "a57835d": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Malta",
+  "evidence": "Acts.28.1 우리가 구원을 얻은 후에 안즉 그 섬은 멜리데라 하더라",
+  "ko": "멜리데",
+  "note": "Malta. auto `멜리데라` — 서술격 `라`가 붙었다",
+  "was": "멜리데라"
+ },
+ "a5947d7": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Tamar 2",
+  "evidence": "Ezek.47.19 남방은 다말에서부터 므리봇 가데스 물에 이르고 애굽 시내를 따라 …",
+  "ko": "다말",
+  "note": "Tamar(남방 경계). auto `다말에서부터` — 조사가 붙은 채 확정됐다",
+  "was": "다말에서부터"
+ },
+ "a5e36e6": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Hor-haggidgad",
+  "evidence": "Num.33.32 브네야아간에서 발행하여 홀하깃갓에 진 쳤고",
+  "ko": "홀하깃갓",
+  "note": "Hor-haggidgad. auto `홀하깃갓에` — 조사가 붙은 채 확정됐다",
+  "was": "홀하깃갓에"
+ },
+ "a63bb26": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Rhegium",
+  "evidence": "Acts.28.13 거기서 둘러가서 레기온에 이르러 하루를 지난 후 남풍이 일어나므로 이튿날 보…",
+  "ko": "레기온",
+  "note": "Rhegium. auto `일어나므로` — 같은 절의 아무 토큰",
+  "was": "일어나므로"
+ },
+ "a6cf75c": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Ur 1",
+  "evidence": "Gen.11.28 하란은 그 아비 데라보다 먼저 본토 갈대아 우르에서 죽었더라",
+  "ko": "우르",
+  "note": "Ur. auto `우르에서` — 조사가 붙은 채 확정됐다",
+  "was": "우르에서"
+ },
+ "a7384d7": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Jotbathah",
+  "evidence": "Num.33.33 홀하깃갓에서 발행하여 욧바다에 진 쳤고",
+  "ko": "욧바다",
+  "note": "Jotbathah. auto `욧바다에` — 조사가 붙은 채 확정됐다",
+  "was": "욧바다에"
+ },
+ "a73af5f": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Haradah",
+  "evidence": "Num.33.24 세벨산에서 발행하여 하라다에 진 쳤고",
+  "ko": "하라다",
+  "note": "Haradah. auto `하라다에` — 조사가 붙은 채 확정됐다",
+  "was": "하라다에"
+ },
+ "a7560c2": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Abronah",
+  "evidence": "Num.33.34 욧바다에서 발행하여 아브로나에 진 쳤고",
+  "ko": "아브로나",
+  "note": "Abronah. auto `아브로나에` — 조사가 붙은 채 확정됐다",
+  "was": "아브로나에"
+ },
+ "a7e13e1": {
+  "cat": "add",
+  "conf": 1.0,
+  "en": "Ai 1",
+  "evidence": "Gen.12.8 …엘 동편 산으로 옮겨 장막을 치니 서는 벧엘이요 동은 아이라 그가 그곳에서 여호와를 위하여 단을 쌓고 여호와의 …",
+  "ko": "아이",
+  "note": "Ai. ko 는 맞는데 auto conf 0.379 — 일반명사 `아이`(child)가 G를 부풀렸다. OpenBible 구절 목록 안에서는 32절 전부가 성읍 아이다",
+  "was": "아이"
+ },
+ "a88331e": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Moseroth",
+  "evidence": "Num.33.30 하스모나에서 발행하여 모세롯에 진 쳤고",
+  "ko": "모세롯",
+  "note": "Moseroth. auto `모세롯에` — 조사가 붙은 채 확정됐다",
+  "was": "모세롯에"
+ },
+ "a8f6a28": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Azmon",
+  "evidence": "Num.34.4 …지나 가데스 바네아 남방에 이르고 또 하살아달을 지나 아스몬에 이르고",
+  "ko": "아스몬",
+  "note": "Azmon. auto `아스몬에` — 조사가 붙은 채 확정됐다",
+  "was": "아스몬에"
+ },
+ "a9bba61": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Kiriath-jearim",
+  "evidence": "Josh.9.17 …읍에 이르렀으니 그 성읍은 기브온과 그비라와 브에롯과 기럇여아림이라",
+  "ko": "기럇여아림",
+  "note": "Kiriath-jearim. auto `기럇`(절단). `기럇`은 베냐민의 딴 성읍 이름이기도 하다(수 18:28). 붙여 쓴 13절만 잡히고 띄어 쓴 `기럇 여아림` 4절은 놓친다 — Snow 판단 필요",
+  "was": "기럇"
+ },
+ "a9ecc26": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Punon",
+  "evidence": "Num.33.42 살모나에서 발행하여 부논에 진 쳤고",
+  "ko": "부논",
+  "note": "Punon. auto `부논에` — 조사가 붙은 채 확정됐다",
+  "was": "부논에"
+ },
+ "a9ee958": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Phoenix",
+  "evidence": "Acts.27.12 그 항구가 과동하기에 불편하므로 거기서 떠나 아무쪼록 뵈닉스에 가서 과동하자 하는 자가 더 많으니 뵈닉스는 그레데…",
+  "ko": "뵈닉스",
+  "note": "Phoenix. auto `불편하므로` — 같은 절의 아무 토큰",
+  "was": "불편하므로"
+ },
+ "aa4b3e2": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Myra",
+  "evidence": "Acts.27.5 길리기아와 밤빌리아 바다를 건너 루기아의 무라성에 이르러",
+  "ko": "무라성",
+  "note": "Myra. auto `무라성에`. `무라` 단독형은 본문에 없다(다른 14절의 `무라`는 `나무라` 등)",
+  "was": "무라성에"
+ },
+ "aa5f658": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Mithkah",
+  "evidence": "Num.33.28 데라에서 발행하여 밋가에 진 쳤고",
+  "ko": "밋가",
+  "note": "Mithkah. auto `밋가에` — 조사가 붙은 채 확정됐다",
+  "was": "밋가에"
+ },
+ "aaa8a88": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Hashmonah",
+  "evidence": "Num.33.29 밋가에서 발행하여 하스모나에 진 쳤고",
+  "ko": "하스모나",
+  "note": "Hashmonah. auto `하스모나에` — 조사가 붙은 채 확정됐다",
+  "was": "하스모나에"
+ },
+ "aae626a": {
+  "cat": "add",
+  "conf": 1.0,
+  "en": "Fair Havens",
+  "evidence": "Acts.27.8 간신히 그 연안을 지나 미항이라는 곳에 이르니 라새아성에서 가깝더라",
+  "ko": "미항",
+  "note": "Fair Havens. Spike 00 매핑 실패(ko=null). 개역한글은 `미항`(美港)",
+  "was": null
+ },
+ "ab635e4": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Dothan",
+  "evidence": "Gen.37.17 …되 그들이 여기서 떠났느니라 내가 그들의 말을 들으니 도단으로 가자 하더라 요셉이 그 형들의 뒤를 따라 가서 도…",
+  "ko": "도단",
+  "note": "Dothan. auto `도단에` — 조사가 붙은 채 확정됐다",
+  "was": "도단에"
+ },
+ "ab793ce": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Cnidus",
+  "evidence": "Acts.27.7 배가 더디 가 여러 날만에 간신히 니도 맞은편에 이르러 풍세가 더 허락지 아니하므로 살모네 …",
+  "ko": "니도",
+  "note": "Cnidus. 자동은 같은 절의 `살모네`(Salmone)를 집었다",
+  "was": "살모네"
+ },
+ "abe40d1": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Tahath",
+  "evidence": "Num.33.26 막헬롯에서 발행하여 다핫에 진 쳤고",
+  "ko": "다핫",
+  "note": "Tahath. auto `다핫에` — 조사가 붙은 채 확정됐다",
+  "was": "다핫에"
+ },
+ "ac1fbba": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Makheloth",
+  "evidence": "Num.33.25 하라다에서 발행하여 막헬롯에 진 쳤고",
+  "ko": "막헬롯",
+  "note": "Makheloth. auto `막헬롯에` — 조사가 붙은 채 확정됐다",
+  "was": "막헬롯에"
+ },
+ "ac2f5ea": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Baalah 2",
+  "evidence": "Josh.15.10 또 바알라에서부터 서편으로 돌이켜 세일산에 이르러 여아림산 곧 …",
+  "ko": "바알라",
+  "note": "Baalah(유다). auto `기럇` — 같은 절의 다른 지명(Kiriath-jearim)의 절단형을 집었다",
+  "was": "기럇"
+ },
+ "ac79b33": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Rimmon-perez",
+  "evidence": "Num.33.19 릿마에서 발행하여 림몬베레스에 진 쳤고",
+  "ko": "림몬베레스",
+  "note": "Rimmon-perez. auto `림몬베레스에` — 조사가 붙은 채 확정됐다",
+  "was": "림몬베레스에"
+ },
+ "aca2b0a": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Cauda",
+  "evidence": "Acts.27.16 가우다라는 작은 섬 아래로 지나 간신히 거루를 잡아",
+  "ko": "가우다",
+  "note": "Cauda. auto `가우다라는` — `라는`이 붙었다",
+  "was": "가우다라는"
+ },
+ "ad36371": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Syrtis",
+  "evidence": "Acts.27.17 끌어 올리고 줄을 가지고 선체를 둘러 감고 스르디스에 걸릴까 두려워 연장을 내리고 그냥 쫓겨가더니",
+  "ko": "스르디스",
+  "note": "Syrtis. auto `쫓겨가더니` — 같은 절의 아무 토큰",
+  "was": "쫓겨가더니"
+ },
+ "ad3970d": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Marah",
+  "evidence": "Exod.15.23 마라에 이르렀더니 그곳 물이 써서 마시지 못하겠으므로 그 …",
+  "ko": "마라",
+  "note": "Marah. auto `마라에` — 조사가 붙은 채 확정됐다",
+  "was": "마라에"
+ },
+ "ad3e63c": {
+  "cat": "add",
+  "conf": 1.0,
+  "en": "Goshen 2",
+  "evidence": "Josh.10.41 여호수아가 또 가데스 바네아에서 가사까지와 온 고센 땅을 기브온에 이르기까지 치매",
+  "ko": "고센",
+  "note": "Goshen(유다). ko 는 맞는데 auto conf 0.577. 애굽 고센과 구절 목록이 갈라져 있어 충돌 없다",
+  "was": "고센"
+ },
+ "ad8027f": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Mount Hor 1",
+  "evidence": "Num.20.22 이스라엘 자손 곧 온 회중이 가데스에서 진행하여 호르산에 이르렀더니",
+  "ko": "호르산",
+  "note": "Mount Hor. auto `호르산에` — 조사가 붙은 채 확정됐다",
+  "was": "호르산에"
+ },
+ "ada6b64": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Gerasa",
+  "evidence": "Mark.5.1 예수께서 바다 건너편 거라사인의 지방에 이르러",
+  "ko": "거라사",
+  "note": "Gerasa. auto `거라사인의` — 조사가 붙은 채 확정됐다",
+  "was": "거라사인의"
+ },
+ "adc77fb": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Adriatic Sea",
+  "evidence": "Acts.27.27 열 나흘째 되는 날 밤에 우리가 아드리아 바다에 이리 저리 쫓겨 가더니 밤중쯤 되어 사공들이 어느 …",
+  "ko": "아드리아 바다",
+  "note": "Adriatic Sea. auto `가까와지는`. 개역한글은 두 낱말 `아드리아 바다`",
+  "was": "가까와지는"
+ },
+ "aeb052c": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Almon-diblathaim",
+  "evidence": "Num.33.46 디본갓에서 발행하여 알몬디블라다임에 진 쳤고",
+  "ko": "알몬디블라다임",
+  "note": "Almon-diblathaim. auto `알몬디블라다임에` — 조사가 붙은 채 확정됐다",
+  "was": "알몬디블라다임에"
+ },
+ "aeb09c0": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Helam",
+  "evidence": "2Sam.10.16 …보내어 강 건너편에 있는 아람 사람을 불러내매 저희가 헬람에 이르니 하닷에셀의 군대 장관 소박이 저희를 거느린지…",
+  "ko": "헬람",
+  "note": "Helam. auto `헬람에` — 조사가 붙은 채 확정됐다",
+  "was": "헬람에"
+ },
+ "aeeaca0": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Lehi",
+  "evidence": "Judg.15.9 이에 블레셋 사람이 올라와서 유다에 진을 치고 레히에 편만한지라",
+  "ko": "레히",
+  "note": "Lehi. auto `레히에` — 조사가 붙은 채 확정됐다",
+  "was": "레히에"
+ },
+ "aefaa2d": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Mount Nebo",
+  "evidence": "Deut.32.49 너는 여리고 맞은편 모압 땅에 있는 아바림산에 올라 느보산에 이르러 내가 이스라엘 자손에게 기업으로 주는 가나안…",
+  "ko": "느보산",
+  "note": "Mount Nebo. auto `느보산에` — 조사가 붙은 채 확정됐다",
+  "was": "느보산에"
+ },
+ "aefdac1": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Rezeph",
+  "evidence": "2Kgs.19.12 내 열조가 멸하신 열방 곧 고산과 하란과 레셉과 들라살에 있는 에덴 족속을 그 나라의 신들이 건졌느…",
+  "ko": "레셉",
+  "note": "Rezeph. auto `들라살에` — 같은 절의 다른 지명(Telassar)을 집었다. Telassar 를 `들라살`로 줄이자 더 긴 이 오답이 그 자리를 뺏어서 함께 고쳐야 했다",
+  "was": "들라살에"
+ },
+ "af04ad9": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Rissah",
+  "evidence": "Num.33.21 립나에서 발행하여 릿사에 진 쳤고",
+  "ko": "릿사",
+  "note": "Rissah. auto `릿사에` — 조사가 붙은 채 확정됐다",
+  "was": "릿사에"
+ },
+ "af084cf": {
+  "cat": "suppress",
+  "en": "Shephelah",
+  "evidence": "Josh.10.40 이와 같이 여호수아가 온 땅 곧 산지와 남방과 평지와 경사지와 그 모든 왕을 쳐서 하나도 남기지 아니하고…",
+  "ko": null,
+  "note": "Shephelah. 개역한글 `평지`. 지명이 아닌 자리에 더 많이 쓰인다(왕상 10:27 `평지의 뽕나무`, 왕상 20:23 `평지에서 저희와 싸우면`). 밑줄 금지",
+  "was": "평지"
+ },
+ "af48fdd": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Bezek 1",
+  "evidence": "Judg.1.4 … 사람과 브리스 사람을 그들의 손에 붙이신지라 그들이 베섹에서 일만명을 죽이고",
+  "ko": "베섹",
+  "note": "Bezek. auto `베섹에서` — 조사가 붙은 채 확정됐다",
+  "was": "베섹에서"
+ },
+ "af6476f": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Shamir 2",
+  "evidence": "Judg.10.1 …가 일어나서 이스라엘을 구원하니라 그가 에브라임 산지 사밀에 거하여",
+  "ko": "사밀",
+  "note": "Shamir. auto `사밀에` — 조사가 붙은 채 확정됐다",
+  "was": "사밀에"
+ },
+ "af693b8": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Mount Paran",
+  "evidence": "Deut.33.2 …으되 여호와께서 시내에서 오시고 세일산에서 일어나시고 바란산에서 비취시고 일만 성도 가운데서 강림하셨고 그 오른손…",
+  "ko": "바란산",
+  "note": "Mount Paran. auto `바란산에서` — 조사가 붙은 채 확정됐다",
+  "was": "바란산에서"
+ },
+ "af936bd": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Valley of Salt",
+  "evidence": "2Sam.8.13 다윗이 염곡에서 에돔 사람 일만 팔천을 쳐죽이고 돌아와서 명예를 …",
+  "ko": "염곡",
+  "note": "Valley of Salt. auto `염곡에` — 조사가 붙은 채 확정됐다",
+  "was": "염곡에"
+ },
+ "afef438": {
+  "cat": "fix",
+  "conf": 1.0,
+  "en": "Three Taverns",
+  "evidence": "Acts.28.15 거기 형제들이 우리 소식을 듣고 압비오 저자와 삼관까지 맞으러 오니 바울이 저희를 보고 하나님께 사례하고…",
+  "ko": "삼관",
+  "note": "Three Taverns. auto `삼관까지`",
+  "was": "삼관까지"
+ }
+}

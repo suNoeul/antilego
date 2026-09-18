@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Antilego — 읽기</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <nav class="topbar-in">
+    <select id="sel-book" aria-label="권"></select>
+    <select id="sel-chapter" aria-label="장"></select>
+    <button id="btn-prev" class="ghost" type="button" aria-label="이전 장">‹</button>
+    <button id="btn-next" class="ghost" type="button" aria-label="다음 장">›</button>
+    <span class="grow"></span>
+    <button id="btn-theme" class="ghost" type="button" aria-label="다크 모드" aria-pressed="false">☾</button>
+  </nav>
+</header>
+
+<main class="cols">
+  <article class="read">
+    <details id="chapmap" class="fold">
+      <summary><span class="caret">▸</span> 이 장의 지도</summary>
+      <div id="chapmap-body" class="fold-body"></div>
+    </details>
+    <h1 id="title" class="title"></h1>
+    <div id="verses" class="verses"></div>
+  </article>
+  <aside class="side"><div id="side-card" class="sticky"></div></aside>
+</main>
+
+<footer class="attr"><p id="attr-line"></p></footer>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="지도 크게 보기">
+    <div id="modal-body"></div>
+    <button id="modal-close" class="ghost modal-x" type="button">닫기</button>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -37,9 +37,9 @@ spikes/01-web-prototype/
   "book": "Josh", "chapter": 10,
   "verses": [
     { "v": 1, "text": "여호수아가 아이를 취하여 …",
-      "mentions": [ { "s": 12, "e": 15, "p": "jericho" } ] }
+      "mentions": [ { "s": 12, "e": 15, "p": "a231f80" } ] }
   ],
-  "places": [ { "p": "jericho", "n": 2 } ]
+  "places": [ { "p": "a231f80", "n": 2 } ]
 }
 ```
 - `text`는 개역한글 본문 **원문 그대로** (수정 금지 — 동일성유지권). 주 본문은 `bluesaurel`.
@@ -54,15 +54,16 @@ spikes/01-web-prototype/
 
 ### `places.json`
 ```json
-{ "jericho": { "ko": "여리고", "en": "Jericho", "lat": 31.87, "lon": 35.44, "n": 57, "conf": 0.9 }, ... }
+{ "a231f80": { "ko": "여리고", "en": "Jericho 1", "lat": 31.87172, "lon": 35.44456, "n": 57, "conf": 0.87 }, ... }
 ```
-- 키는 `places.ko.json`의 place_id 그대로. **mention이 하나 이상 있는 장소만** 포함.
+- 키는 `places.ko.json`의 place_id 그대로 = OpenBible ancient id (`a` + 16진수 6자리). **mention이 하나 이상 있는 장소만** 포함.
 - `lat`,`lon`은 OpenBible 대표 좌표(WGS84). 좌표가 없는 장소(지역명 등)는 제외하고 RESULT.md에 수 보고.
+  좌표가 없어 `places.json`에 못 들어가는 장소는 **장 JSON의 `mentions`에서도 뺀다** — 모든 `p`는 `places.json`에서 찾을 수 있다. (A, 2026-09-18 명확화)
 - `n`은 성경 전체 mention 수(밑줄 실제 생성 기준).
 
 ### `geo/*.json` — 양식화 맵 배경
 - 출처 **Natural Earth 1:10m** (퍼블릭 도메인): `land` (ne_10m_land), `lakes` (ne_10m_lakes), `rivers` (ne_10m_rivers_lake_centerlines).
-- bbox `[25, 25, 50, 42]` (lon_min, lat_min, lon_max, lat_max)로 클리핑, WGS84 유지, 단순화(Douglas-Peucker 등)해서 **세 파일 합계 ≤ 600KB**.
+- bbox `[8, 24, 50, 43]` (바울의 로마 항해 — 이탈리아·시칠리아·몰타·크레테 포함. 초안의 `[25,25,50,42]`는 로마(12.5°E)를 잘라냈음) (lon_min, lat_min, lon_max, lat_max)로 클리핑, WGS84 유지, 단순화(Douglas-Peucker 등)해서 **세 파일 합계 ≤ 600KB**.
 - GeoJSON FeatureCollection. rivers는 `properties.name` 유지 (요단/나일/유프라테스/티그리스 확인용).
 - 갈릴리 호수·사해가 `lakes`에 들어 있어야 한다. 없으면 RESULT.md에 명시.
 - `geo/meta.json`: `{ "bbox": [...], "source": "Natural Earth 1:10m v5.x", "simplify_tolerance": ... }`
@@ -107,7 +108,7 @@ spikes/01-web-prototype/
 - 폴리곤이 bbox 밖으로 나가도 그냥 그린다(SVG가 clip). 성능: 장별 Scene 렌더 < 50ms 목표. land 폴리곤은 path 하나로 합쳐도 됨.
 
 ### 라우팅 / 상태
-- URL 해시: `#Josh.10` (장), `#Josh.10/jericho` (선택 지명). 로드 시 해시 없으면 `#Gen.1`.
+- URL 해시: `#Josh.10` (장), `#Josh.10/a231f80` (선택 지명 — `places.json` 키). 로드 시 해시 없으면 `#Gen.1`.
 - 마지막 읽은 장·다크모드는 `localStorage`. 실패해도 동작.
 - 장 이동 시 스크롤 맨 위.
 

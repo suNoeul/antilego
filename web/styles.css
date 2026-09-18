@@ -1,0 +1,239 @@
+/* Antilego — 읽기 뷰. 본문이 주인공, 지도는 각주. */
+
+:root {
+  /* 지도 토큰 (스펙) */
+  --sea: #cfe3e6;
+  --land: #f6f1e7;
+  --coast: #a08461;
+  --river: #7fa7c9;
+  --dot: #8a5a2b;
+  --dot-dim: #c7b8a3;
+  --label: #2b2b2b;
+  /* UI 토큰 */
+  --bg: #fbf7ef;
+  --card: #fffdf8;
+  --ink: #23201c;
+  --muted: #8b8276;
+  --line: #e4dccd;
+  --accent: #8a5a2b;
+  --hl: rgba(138, 90, 43, .13);
+  --shadow: 0 1px 3px rgba(60, 45, 25, .07);
+  --serif: "Noto Serif KR", "Apple SD Gothic Neo", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  --sea: #1d2a30;
+  --land: #2a2622;
+  --coast: #6b5a45;
+  --river: #4c6f8f;
+  --dot: #d9a066;
+  --dot-dim: #5a5048;
+  --label: #e8e2d8;
+  --bg: #171513;
+  --card: #201d1a;
+  --ink: #e8e2d8;
+  --muted: #948a7d;
+  --line: #322d27;
+  --accent: #d9a066;
+  --hl: rgba(217, 160, 102, .12);
+  --shadow: 0 1px 3px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-text-size-adjust: 100%;
+}
+/* overflow-x 는 html 에만 둔다. body 에 주면 body 가 스크롤 컨테이너가 되어
+   .topbar / #side-card 의 position:sticky 가 통째로 깨진다 (RESULT.md V1). */
+html { overflow-x: hidden; }
+
+/* --- 상단바 --- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 48px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-in {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+.grow { flex: 1; }
+
+select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 4px 6px;
+  max-width: 40vw;
+}
+select:focus-visible, .ghost:focus-visible, .place:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ghost {
+  font: inherit;
+  font-size: 15px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  padding: 4px 9px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.ghost:hover { color: var(--ink); background: var(--hl); }
+.ghost[disabled] { opacity: .3; cursor: default; background: none; }
+
+/* --- 레이아웃 --- */
+.cols {
+  display: grid;
+  grid-template-columns: minmax(0, 640px);
+  justify-content: center;
+  gap: 40px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 16px 8px;
+}
+.read { min-width: 0; }
+.side { display: none; }
+
+@media (min-width: 900px) {
+  .cols { grid-template-columns: 640px 320px; justify-content: center; }
+  .side { display: block; }
+  .sticky { position: sticky; top: 64px; }
+}
+
+/* --- 접힌 지도. 닫혀 있을 때는 한 줄짜리 각주처럼 --- */
+.fold {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+.fold > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary:hover { color: var(--ink); }
+.caret { display: inline-block; transition: transform .15s; }
+.fold[open] .caret { transform: rotate(90deg); }
+.fold-body { padding: 0 0 18px; max-width: 360px; }
+
+/* --- 본문 --- */
+.title {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  margin: 0 0 20px;
+}
+.verses { font-family: var(--serif); font-size: 17px; line-height: 1.9; }
+.verse { margin: 0 0 1.15em; }
+.vnum {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--muted);
+  vertical-align: super;
+  line-height: 0;
+  margin-right: 5px;
+  user-select: none;
+}
+
+.place {
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  border-bottom: 1px dotted var(--accent);
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+}
+.place:hover { border-bottom-style: solid; }
+.place[aria-pressed="true"] {
+  background: var(--hl);
+  border-bottom-style: solid;
+  padding: 0 2px;
+  margin: 0 -2px;
+  border-radius: 3px;
+}
+
+.msg { font-family: var(--sans); font-size: 14px; color: var(--muted); }
+
+/* --- 카드 --- */
+.card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+.card.bare { border: 0; box-shadow: none; background: none; padding: 0; }
+.card-map { display: block; width: 100%; height: auto; border-radius: 5px; }
+.card-name { font-size: 18px; font-weight: 700; margin: 10px 0 0; }
+.card-en { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
+.card-n { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.card-hint { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+.card-foot { margin-top: 8px; }
+.card-foot .ghost { font-size: 12px; padding: 3px 7px; border: 1px solid var(--line); }
+
+/* 모바일: 탭한 절 아래 인라인 카드 */
+.inline-card { margin: 0 0 1.15em; }
+
+/* --- 하단 출처 --- */
+.attr {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+.attr p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+/* --- 모달 --- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(30, 24, 16, .45);
+}
+.modal[hidden] { display: none; }
+.modal-box {
+  width: 100%;
+  max-width: 720px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+.modal-x { float: right; font-size: 13px; margin-top: 8px; }
