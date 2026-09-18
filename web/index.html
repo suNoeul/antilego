@@ -25,24 +25,34 @@
 
 <main class="cols">
   <article class="read">
-    <details id="chapmap" class="fold">
-      <summary><span class="caret">▸</span> 이 장의 지도</summary>
-      <div id="chapmap-body" class="fold-body"></div>
-    </details>
     <h1 id="title" class="title"></h1>
     <div id="verses" class="verses"></div>
   </article>
-  <aside class="side"><div id="side-card" class="sticky"></div></aside>
 </main>
 
 <footer class="attr"><p id="attr-line"></p></footer>
 
-<div id="modal" class="modal" hidden>
-  <div class="modal-box" role="dialog" aria-modal="true" aria-label="지도 크게 보기">
-    <div id="modal-body"></div>
-    <button id="modal-close" class="ghost modal-x" type="button">닫기</button>
+<!-- 지도 패널 하나. 기본 닫힘. -->
+<div id="scrim" class="scrim"></div>
+
+<button id="btn-map" class="fab" type="button" aria-expanded="false" aria-controls="panel">지도</button>
+
+<aside id="panel" class="panel" aria-label="지도 패널">
+  <div id="grip" class="grip" aria-hidden="true"><span></span></div>
+  <div class="panel-in">
+    <div class="map-wrap">
+      <svg id="map" class="panel-map"></svg>
+      <div class="zoom-ctl">
+        <button id="z-in" class="zbtn" type="button" aria-label="확대">+</button>
+        <button id="z-out" class="zbtn" type="button" aria-label="축소">−</button>
+        <button id="z-reset" class="zbtn" type="button" aria-label="원래대로">⟲</button>
+      </div>
+    </div>
+    <div id="place-block" class="place-block"></div>
+    <div id="era-caption" class="era-caption"></div>
+    <p id="panel-attr" class="panel-attr"></p>
   </div>
-</div>
+</aside>
 
 <script type="module" src="app.js"></script>
 </body>

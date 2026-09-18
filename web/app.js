@@ -1,5 +1,6 @@
 // Antilego 읽기 뷰. 본문이 주인공, 지도는 각주.
-import { renderScene } from './map.js';
+// 지도는 패널 하나뿐이다. 기본 닫힘 → 플로팅 버튼이나 지명 클릭으로 연다.
+import { renderScene, clampView, zoomAt, BASE_VIEW, W, H } from './map.js';
 
 // 데이터 경로. 기본 ./data/ , ?data=data-fixture 로 픽스처.
 const q = new URLSearchParams(location.search).get('data');
@@ -19,7 +20,9 @@ const ls = {
 
 const state = {
   index: null, places: {}, layers: {}, attr: [],
-  book: null, ch: null, data: null, sel: null, selV: null,   // book=null → 첫 apply()에서 무조건 로드
+  book: null, ch: null, data: null, sel: null,   // book=null → 첫 apply()에서 무조건 로드
+  open: false,                                   // 패널 열림 여부
+  view: { ...BASE_VIEW },                        // 지도 확대·이동
 };
 
 const getJSON = async path => {
@@ -36,7 +39,7 @@ function setTheme(t) {
   ls.set('theme', t);
 }
 
-// --- 해시 라우팅: #Josh.10 / #Josh.10/jericho ---
+// --- 해시 라우팅: #Josh.10 / #Josh.10/a231f80 ---
 function parseHash() {
   const m = /^#([\w]+)\.(\d+)(?:\/([\w-]+))?$/.exec(location.hash);
   return m ? { book: m[1], ch: +m[2], sel: m[3] || null } : null;
@@ -47,8 +50,9 @@ function go(book, ch, sel) {
   location.hash = h;
 }
 
-// --- 장면 / 카드 ---
-function scene(pid) {
+// --- 장면 ---
+function scene() {
+  const pid = state.sel;
   const inCh = (state.data?.places || []).map(x => x.p).filter(p => state.places[p]);
   return {
     focus: pid && state.places[pid] ? [pid] : [],
@@ -57,20 +61,38 @@ function scene(pid) {
   };
 }
 
-function makeCard(pid, bare) {
-  const box = document.createElement('div');
-  box.className = 'card' + (bare ? ' bare' : '');
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'card-map');
-  box.append(svg);
-  renderScene(svg, scene(pid), state.layers, TOKENS);
+// --- 지도 패널 ---
+function drawMap() {
+  state.view = clampView(state.view);
+  state.render = renderScene($('map'), scene(), state.layers, TOKENS, state.view);
+  $('z-out').disabled = state.view.z <= 1.001;
+  $('z-in').disabled = state.view.z >= 7.999;
+}
 
-  const p = pid && state.places[pid];
+// `+` `−` 버튼이 기준으로 삼는 점: 선택된 지명, 없으면 이 장 지명들의 무게중심.
+// 화면 한가운데를 기준으로 삼으면 확대할수록 지명이 화면 밖으로 밀려난다.
+function anchor() {
+  const proj = state.render?.project;
+  const ids = state.sel && state.places[state.sel]
+    ? [state.sel]
+    : (state.data?.places || []).map(x => x.p).filter(p => state.places[p]);
+  if (!proj || !ids.length) return [W / 2, H / 2];
+  const lon = ids.reduce((a, p) => a + state.places[p].lon, 0) / ids.length;
+  const lat = ids.reduce((a, p) => a + state.places[p].lat, 0) / ids.length;
+  const [x, y] = proj(lon, lat);
+  return [Math.max(0, Math.min(W, x)), Math.max(0, Math.min(H, y))];
+}
+
+function renderPanel() {
+  drawMap();
+  const box = $('place-block');
+  box.textContent = '';
+  const p = state.sel && state.places[state.sel];
   if (p) {
-    const chN = (state.data?.places || []).find(x => x.p === pid)?.n || 0;
+    const chN = (state.data?.places || []).find(x => x.p === state.sel)?.n || 0;
     box.insertAdjacentHTML('beforeend',
       '<p class="card-name"></p><p class="card-en"></p><p class="card-n"></p>');
-    box.querySelector('.card-name').textContent = p.ko || pid;
+    box.querySelector('.card-name').textContent = p.ko || state.sel;
     box.querySelector('.card-en').textContent = p.en || '';
     box.querySelector('.card-n').textContent =
       `이 장에서 ${chN}회 · 성경 전체 ${p.n ?? '?'}회`;
@@ -80,28 +102,19 @@ function makeCard(pid, bare) {
     hint.textContent = '지명을 누르면 위치를 보여줍니다';
     box.append(hint);
   }
-
-  if (!bare) {
-    const foot = document.createElement('div');
-    foot.className = 'card-foot';
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'ghost'; b.textContent = '크게 보기';
-    b.addEventListener('click', () => openModal(pid));
-    foot.append(b);
-    box.append(foot);
-  }
-  return box;
 }
 
-// --- 모달 ---
-function openModal(pid) {
-  const body = $('modal-body');
-  body.textContent = '';
-  body.append(makeCard(pid, true));
-  $('modal').hidden = false;
-  $('modal-close').focus();
+function setPanel(open, remember = true) {
+  state.open = !!open;
+  document.body.classList.toggle('panel-open', state.open);
+  $('btn-map').setAttribute('aria-expanded', String(state.open));
+  $('btn-map').textContent = state.open ? '닫기' : '지도';
+  $('panel').setAttribute('aria-hidden', String(!state.open));
+  if (remember) ls.set('panel', state.open ? '1' : '0');
+  if (state.open) renderPanel();
 }
-const closeModal = () => { $('modal').hidden = true; };
+
+const resetView = () => { state.view = { ...BASE_VIEW }; };
 
 // --- 본문 ---
 function renderVerse(v) {
@@ -133,29 +146,11 @@ function renderVerse(v) {
   return p;
 }
 
-const wide = () => window.matchMedia('(min-width: 900px)').matches;
-
 function applySel() {
   for (const b of document.querySelectorAll('.place')) {
     b.setAttribute('aria-pressed', String(b.dataset.p === state.sel));
   }
-  document.querySelector('.inline-card')?.remove();
-  const side = $('side-card');
-  side.textContent = '';
-  side.append(makeCard(state.sel, false));
-
-  const v = state.selV; state.selV = null;   // 탭한 절은 한 번만 쓴다
-  if (!wide() && state.sel) {
-    const host = v != null
-      ? document.querySelector(`.verse[data-v="${v}"]`)
-      : document.querySelector(`.place[data-p="${state.sel}"]`)?.closest('.verse');
-    if (host) {
-      const wrap = document.createElement('div');
-      wrap.className = 'inline-card';
-      wrap.append(makeCard(state.sel, false));
-      host.after(wrap);
-    }
-  }
+  if (state.open) renderPanel();
 }
 
 function showMsg(text) {
@@ -170,19 +165,16 @@ async function loadChapter() {
   const b = bookOf(state.book);
   $('title').textContent = (b ? b.ko : state.book) + ' ' + state.ch + '장';
   $('verses').textContent = '';
-  $('chapmap-body').textContent = '';
   state.data = null;
   try {
     state.data = await getJSON(`books/${state.book}/${state.ch}.json`);
   } catch {
     showMsg('이 장을 불러오지 못했습니다. 데이터가 아직 없을 수 있습니다.');
-    $('side-card').textContent = '';
     return;
   }
   const frag = document.createDocumentFragment();
   for (const v of state.data.verses) frag.append(renderVerse(v));
   $('verses').append(frag);
-  $('chapmap-body').append(makeCard(null, false));
 }
 
 // --- 상단바 ---
@@ -229,8 +221,8 @@ async function apply() {
   const r = parseHash();
   if (!r) { location.hash = '#Gen.1'; return; }
   const changed = r.book !== state.book || r.ch !== state.ch;
+  const selChanged = r.sel !== state.sel;
   state.book = r.book; state.ch = r.ch;
-  if (changed) state.selV = null;
   state.sel = r.sel;
 
   if (changed) {
@@ -242,7 +234,103 @@ async function apply() {
   } else {
     syncNav();
   }
+  if (changed || selChanged) resetView();   // 새 장면 → 확대 초기화
   applySel();
+}
+
+// --- 지도 조작 (휠·드래그·핀치·더블클릭) ---
+function bindMapGestures() {
+  const svg = $('map');
+  const toView = (clientX, clientY) => {
+    const r = svg.getBoundingClientRect();
+    if (!r.width || !r.height) return [W / 2, H / 2];
+    return [(clientX - r.left) / r.width * W, (clientY - r.top) / r.height * H];
+  };
+  const pxPerUnit = () => {
+    const r = svg.getBoundingClientRect();
+    return r.width ? r.width / W : 1;
+  };
+
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const [cx, cy] = toView(e.clientX, e.clientY);
+    state.view = zoomAt(state.view, cx, cy, Math.exp(-e.deltaY * 0.0022));
+    drawMap();
+  }, { passive: false });
+
+  svg.addEventListener('dblclick', e => {
+    e.preventDefault();
+    const [cx, cy] = toView(e.clientX, e.clientY);
+    state.view = zoomAt(state.view, cx, cy, 1.8);
+    drawMap();
+  });
+
+  // 포인터 1개 = 이동, 2개 = 핀치
+  const pts = new Map();
+  let last = null, pinch = null;
+  svg.addEventListener('pointerdown', e => {
+    svg.setPointerCapture?.(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 1) { last = { x: e.clientX, y: e.clientY }; pinch = null; }
+    if (pts.size === 2) { last = null; pinch = pinchState(); }
+    svg.classList.add('grabbing');
+  });
+  const pinchState = () => {
+    const [a, b] = [...pts.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    const mid = toView((a.x + b.x) / 2, (a.y + b.y) / 2);
+    return { d: d || 1, mid };
+  };
+  svg.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2 && pinch) {
+      const now = pinchState();
+      state.view = zoomAt(state.view, now.mid[0], now.mid[1], now.d / pinch.d);
+      pinch = now;
+      drawMap();
+      return;
+    }
+    if (pts.size === 1 && last) {
+      const k = pxPerUnit();
+      state.view = clampView({
+        z: state.view.z,
+        px: state.view.px + (e.clientX - last.x) / k,
+        py: state.view.py + (e.clientY - last.y) / k,
+      });
+      last = { x: e.clientX, y: e.clientY };
+      drawMap();
+    }
+  });
+  const up = e => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (pts.size === 1) { const [p] = [...pts.values()]; last = { x: p.x, y: p.y }; }
+    if (pts.size === 0) { last = null; svg.classList.remove('grabbing'); }
+  };
+  svg.addEventListener('pointerup', up);
+  svg.addEventListener('pointercancel', up);
+
+  const zoomBtn = f => () => {
+    const [ax, ay] = anchor();
+    state.view = zoomAt(state.view, ax, ay, f);
+    drawMap();
+  };
+  $('z-in').addEventListener('click', zoomBtn(1.6));
+  $('z-out').addEventListener('click', zoomBtn(1 / 1.6));
+  $('z-reset').addEventListener('click', () => { resetView(); drawMap(); });
+}
+
+// 모바일 시트: 손잡이를 아래로 끌면 닫힌다
+function bindGrip() {
+  const grip = $('grip');
+  let y0 = null;
+  grip.addEventListener('pointerdown', e => { y0 = e.clientY; grip.setPointerCapture?.(e.pointerId); });
+  grip.addEventListener('pointerup', e => {
+    if (y0 != null && e.clientY - y0 > 50) setPanel(false);
+    y0 = null;
+  });
+  grip.addEventListener('pointercancel', () => { y0 = null; });
 }
 
 // --- 부팅 ---
@@ -265,7 +353,9 @@ async function boot() {
   for (const k of ['land', 'lakes', 'rivers']) {
     try { state.layers[k] = await getJSON(`geo/${k}.json`); } catch { state.layers[k] = null; }
   }
-  $('attr-line').textContent = (state.attr || []).join(' · ');
+  const attrLine = (state.attr || []).join(' · ');
+  $('attr-line').textContent = attrLine;
+  $('panel-attr').textContent = attrLine;
 
   fillBooks();
   $('sel-book').addEventListener('change', e => go(e.target.value, 1, null));
@@ -273,19 +363,23 @@ async function boot() {
   $('btn-prev').addEventListener('click', () => step(-1));
   $('btn-next').addEventListener('click', () => step(1));
 
+  $('btn-map').addEventListener('click', () => setPanel(!state.open));
+  $('scrim').addEventListener('click', () => setPanel(false));
+  bindMapGestures();
+  bindGrip();
+
   document.addEventListener('click', e => {
     const b = e.target.closest?.('.place');
-    if (b) {
-      const on = b.dataset.p === state.sel;       // 같은 지명 → 닫기
-      state.selV = on ? null : +b.closest('.verse').dataset.v;
-      go(state.book, state.ch, on ? null : b.dataset.p);
-      return;
-    }
-    if (e.target === $('modal')) closeModal();
+    if (!b) return;
+    const on = b.dataset.p === state.sel;       // 같은 지명 → 선택 해제
+    go(state.book, state.ch, on ? null : b.dataset.p);
+    if (!state.open) setPanel(true);            // 지명을 누르면 패널이 열린다
   });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-  $('modal-close').addEventListener('click', closeModal);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && state.open) setPanel(false);
+  });
   window.addEventListener('hashchange', apply);
+  window.addEventListener('resize', () => { if (state.open) drawMap(); });
 
   if (!location.hash) {
     const last = ls.get('last');
@@ -293,6 +387,10 @@ async function boot() {
     const b = m && bookOf(m[1]);
     location.hash = b ? `#${m[1]}.${m[2]}` : '#Gen.1';
   }
+  // 패널 열림 상태는 기억한다. 저장된 값이 없으면 닫힘.
+  setPanel(ls.get('panel') === '1', false);
+  // 검증(헤드리스 CDP)과 다음 스파이크를 위한 디버그 핸들. 앱 동작에는 관여하지 않는다.
+  window.__antilego = { state, drawMap, setPanel, anchor };
   await apply();
 }
 

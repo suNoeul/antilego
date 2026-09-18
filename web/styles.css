@@ -17,9 +17,16 @@
   --line: #e4dccd;
   --accent: #8a5a2b;
   --hl: rgba(138, 90, 43, .13);
+  --hl-soft: rgba(138, 90, 43, .07);
   --shadow: 0 1px 3px rgba(60, 45, 25, .07);
+  --panel-shadow: -6px 0 24px rgba(60, 45, 25, .10);
+  --scrim: rgba(30, 24, 16, .28);
   --serif: "Noto Serif KR", "Apple SD Gothic Neo", serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* 지도 패널 */
+  --panel-w: 400px;
+  --sheet-h: 55vh;
+  --topbar-h: 48px;
 }
 
 [data-theme="dark"] {
@@ -37,7 +44,10 @@
   --line: #322d27;
   --accent: #d9a066;
   --hl: rgba(217, 160, 102, .12);
+  --hl-soft: rgba(217, 160, 102, .07);
   --shadow: 0 1px 3px rgba(0, 0, 0, .3);
+  --panel-shadow: -6px 0 24px rgba(0, 0, 0, .4);
+  --scrim: rgba(0, 0, 0, .45);
 }
 
 * { box-sizing: border-box; }
@@ -50,7 +60,7 @@ html, body {
   -webkit-text-size-adjust: 100%;
 }
 /* overflow-x 는 html 에만 둔다. body 에 주면 body 가 스크롤 컨테이너가 되어
-   .topbar / #side-card 의 position:sticky 가 통째로 깨진다 (RESULT.md V1). */
+   .topbar 의 position:sticky 가 통째로 깨진다 (Spike 01 RESULT.md V1). */
 html { overflow-x: hidden; }
 
 /* --- 상단바 --- */
@@ -58,7 +68,7 @@ html { overflow-x: hidden; }
   position: sticky;
   top: 0;
   z-index: 20;
-  height: 48px;
+  height: var(--topbar-h);
   background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
@@ -66,7 +76,7 @@ html { overflow-x: hidden; }
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 48px;
+  height: var(--topbar-h);
   max-width: 1040px;
   margin: 0 auto;
   padding: 0 16px;
@@ -83,7 +93,8 @@ select {
   padding: 4px 6px;
   max-width: 40vw;
 }
-select:focus-visible, .ghost:focus-visible, .place:focus-visible, summary:focus-visible {
+select:focus-visible, .ghost:focus-visible, .place:focus-visible,
+.fab:focus-visible, .zbtn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -102,42 +113,13 @@ select:focus-visible, .ghost:focus-visible, .place:focus-visible, summary:focus-
 .ghost:hover { color: var(--ink); background: var(--hl); }
 .ghost[disabled] { opacity: .3; cursor: default; background: none; }
 
-/* --- 레이아웃 --- */
+/* --- 레이아웃. 본문 한 컬럼뿐이다 --- */
 .cols {
-  display: grid;
-  grid-template-columns: minmax(0, 640px);
-  justify-content: center;
-  gap: 40px;
-  max-width: 1040px;
+  max-width: 672px;
   margin: 0 auto;
   padding: 28px 16px 8px;
 }
 .read { min-width: 0; }
-.side { display: none; }
-
-@media (min-width: 900px) {
-  .cols { grid-template-columns: 640px 320px; justify-content: center; }
-  .side { display: block; }
-  .sticky { position: sticky; top: 64px; }
-}
-
-/* --- 접힌 지도. 닫혀 있을 때는 한 줄짜리 각주처럼 --- */
-.fold {
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 24px;
-}
-.fold > summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 0 0 10px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.fold > summary::-webkit-details-marker { display: none; }
-.fold > summary:hover { color: var(--ink); }
-.caret { display: inline-block; transition: transform .15s; }
-.fold[open] .caret { transform: rotate(90deg); }
-.fold-body { padding: 0 0 18px; max-width: 360px; }
 
 /* --- 본문 --- */
 .title {
@@ -159,46 +141,22 @@ select:focus-visible, .ghost:focus-visible, .place:focus-visible, summary:focus-
   user-select: none;
 }
 
+/* 지명: 색만 다르다. 밑줄 없음 (Spike 02). */
 .place {
   font: inherit;
   color: var(--accent);
   background: none;
   border: 0;
-  border-bottom: 1px dotted var(--accent);
-  border-radius: 2px;
-  padding: 0;
-  cursor: pointer;
-}
-.place:hover { border-bottom-style: solid; }
-.place[aria-pressed="true"] {
-  background: var(--hl);
-  border-bottom-style: solid;
+  text-decoration: none;
+  border-radius: 3px;
   padding: 0 2px;
   margin: 0 -2px;
-  border-radius: 3px;
+  cursor: pointer;
 }
+.place:hover { background: var(--hl-soft); }
+.place[aria-pressed="true"] { background: var(--hl); }
 
 .msg { font-family: var(--sans); font-size: 14px; color: var(--muted); }
-
-/* --- 카드 --- */
-.card {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
-  box-shadow: var(--shadow);
-  padding: 12px;
-}
-.card.bare { border: 0; box-shadow: none; background: none; padding: 0; }
-.card-map { display: block; width: 100%; height: auto; border-radius: 5px; }
-.card-name { font-size: 18px; font-weight: 700; margin: 10px 0 0; }
-.card-en { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
-.card-n { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
-.card-hint { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
-.card-foot { margin-top: 8px; }
-.card-foot .ghost { font-size: 12px; padding: 3px 7px; border: 1px solid var(--line); }
-
-/* 모바일: 탭한 절 아래 인라인 카드 */
-.inline-card { margin: 0 0 1.15em; }
 
 /* --- 하단 출처 --- */
 .attr {
@@ -215,25 +173,172 @@ select:focus-visible, .ghost:focus-visible, .place:focus-visible, summary:focus-
   padding-top: 12px;
 }
 
-/* --- 모달 --- */
-.modal {
+/* --- 플로팅 버튼 --- */
+.fab {
+  position: fixed;
+  z-index: 45;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: 16px 0 0 16px;
+  padding: 10px 14px 10px 16px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: right .2s ease, bottom .2s ease;
+}
+.fab:hover { filter: brightness(1.08); }
+
+/* --- 가림막 (태블릿 폭에서만) --- */
+.scrim {
   position: fixed;
   inset: 0;
+  z-index: 30;
+  background: var(--scrim);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .2s ease, visibility .2s;
+}
+
+/* --- 지도 패널 하나 --- */
+.panel {
+  position: fixed;
   z-index: 40;
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  width: var(--panel-w);
+  max-width: 100%;
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--panel-shadow);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform .2s ease, visibility .2s;
+}
+body.panel-open .panel { transform: none; visibility: visible; }
+body.panel-open .fab { right: var(--panel-w); }
+
+.panel-in { padding: 14px; }
+.grip { display: none; }
+
+.map-wrap {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.panel-map {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  min-height: 240px;
+  touch-action: none;
+  cursor: grab;
+}
+.panel-map.grabbing { cursor: grabbing; }
+
+.zoom-ctl {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  gap: 4px;
+}
+.zbtn {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  background: rgba(30, 24, 16, .45);
-}
-.modal[hidden] { display: none; }
-.modal-box {
-  width: 100%;
-  max-width: 720px;
+  color: var(--ink);
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  padding: 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: .9;
 }
-.modal-x { float: right; font-size: 13px; margin-top: 8px; }
+.zbtn:hover { background: var(--hl); }
+.zbtn[disabled] { opacity: .35; cursor: default; }
+
+.place-block { min-height: 52px; }
+.card-name { font-size: 18px; font-weight: 700; margin: 12px 0 0; }
+.card-en { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
+.card-n { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.card-hint { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
+
+/* Spike 03 이 채운다 (시대 캡션). 지금은 비어 있다. */
+.era-caption:empty { display: none; }
+.era-caption { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+.panel-attr {
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 14px 0 0;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+/* --- 데스크톱 ≥1200px: 본문을 밀어낸다 --- */
+@media (min-width: 1200px) {
+  body.panel-open { margin-right: var(--panel-w); }
+}
+
+/* --- 태블릿 900–1199px: 덮되 가림막 --- */
+@media (min-width: 900px) and (max-width: 1199px) {
+  body.panel-open .scrim { opacity: 1; visibility: visible; }
+}
+
+/* --- 모바일 <900px: 아래에서 올라오는 시트 --- */
+@media (max-width: 899px) {
+  .panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: var(--sheet-h);
+    max-height: calc(100vh - var(--topbar-h) - 8px);
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 14px 14px 0 0;
+    transform: translateY(100%);
+  }
+  .grip {
+    display: block;
+    padding: 8px 0 2px;
+    text-align: center;
+    cursor: grab;
+    touch-action: none;
+  }
+  .grip span {
+    display: inline-block;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line);
+  }
+  .fab {
+    top: auto;
+    bottom: 16px;
+    right: 16px;
+    transform: none;
+    border-radius: 16px;
+    padding: 10px 16px;
+  }
+  body.panel-open .fab {
+    right: 16px;
+    bottom: calc(var(--sheet-h) + 12px);
+  }
+}
