@@ -9,7 +9,7 @@
 지명을 탭하면 읽던 자리에서 양식화된 미니맵이 펼쳐진다.
 
 궤적: 데이터 → 프로토타입(한 장) → UI 없는 코어 라이브러리+CLI → 웹 → 에이전트 플러그인(MCP) → 모바일 앱.
-현재 단계: **Spike 00 통과(2026-09-17) → Snow 수동 검증 · Spike 01 준비.** 결과: `spikes/00-ko-place-mapping/RESULT.md`
+현재 단계: **Spike 01 배포됨(2026-09-18) — 판정 대기.** 라이브: https://sunoeul.github.io/antilego/  결과: `spikes/01-web-prototype/RESULT.md`
 
 ## 두 공간
 
@@ -44,7 +44,7 @@
 
 | 누가 | 어디 | 무엇 | 시작 |
 |---|---|---|---|
-| Opus F | `spikes/01-web-prototype/` · `web/` · `.github/` | Spike 01 커밋 · GitHub 공개 저장소 · Pages 배포 | 2026-09-18 |
+| — | — | — | — |
 
 ## 디렉토리
 

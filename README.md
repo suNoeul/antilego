@@ -9,7 +9,10 @@
 - 데이터 & 라이선스: [docs/01-data-sources.md](docs/01-data-sources.md)
 - 진행 계획: [docs/02-plan.md](docs/02-plan.md)
 
-현재 상태: **Spike 00 통과 (한글 지명 매핑, 언급 가중 후보 98.9% · 정확도 추정 95.9%). Snow 수동 검증 대기.** 규칙 [AGENTS.md](AGENTS.md), 설계 정본은 노션.
+현재 상태: **Spike 01 배포됨 — 판정 대기 (Snow).** 규칙 [AGENTS.md](AGENTS.md), 설계 정본은 노션.
+
+**라이브 프로토타입:** https://sunoeul.github.io/antilego/#Josh.10
+저장소: https://github.com/suNoeul/antilego
 
 ## 이름에 대하여
 
