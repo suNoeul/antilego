@@ -1,0 +1,1159 @@
+{
+  "version": 2,
+  "generated": "2026-09-18",
+  "_notes": [
+    "시대 구분은 읽기 보조용 '대략'이다. 학술적 연표가 아니다.",
+    "기원전은 음수, 기원후는 양수. 0년은 없다.",
+    "9개 역사 시대 + primeval(원시사) + undated(시대 불특정) = 11개 항목.",
+    "요청받은 8개에서 '포로·귀환'을 '포로'와 '귀환·페르시아'로 나눴다. 지도에 그려야 할 제국이 바벨론과 페르시아로 완전히 바뀌고(예후드 속주 등장), 책 단위로도 예레미야·에스겔·다니엘·애가 / 에스라·느헤미야·에스더·학개·스가랴·말라기로 깨끗하게 갈리기 때문이다.",
+    "polities의 anchor_places_en은 '이 안에 들어가는 대표 지점'일 뿐 경계가 아니다. 다음 단계에서 좌표 힌트로만 쓴다.",
+    "헬라 시대(기원전 332–63)는 해당 정경 책이 없어 시대로 두지 않았다.",
+    "03-c: polity 마다 render(\"blob\"|\"label_only\")를 넣었다. 레반트 코어만 덩이로 그리고, 멀리 떨어진 제국·속주·유목 민족은 label_at 좌표에 이름만 둔다(폴리곤 없음). UI 에서 영역 레이어는 기본 숨김 + 토글이다.",
+    "03-c: 흩어진 polity 를 쪼갰다 — 미디안·아말렉(정복·사사) → 미디안 / 아말렉, 암몬·아라비아(귀환) → 암몬 / 아라비아(게셈), 지중해 섬들·애굽(초대교회) → 지중해 섬들 / 애굽·구레네."
+  ],
+  "eras": [
+    {
+      "id": "primeval",
+      "ko": "원시사",
+      "en": "Primeval History",
+      "approx": "연대 미상 (족장 시대 이전)",
+      "approx_from": null,
+      "approx_to": null,
+      "undated": true,
+      "caption": "창조·홍수·바벨탑의 무대는 특정 나라가 아니라 메소포타미아 일대와 그 주변이다. 여기 나오는 지명(에덴·아라랏·시날)은 위치를 확정하기 어려워 지도에 나라 구분을 그리지 않는다.",
+      "polities": [],
+      "note": "창 1–11은 왕조·연대에 걸 수 있는 고정점이 없다. 성경 계보를 문자적으로 더하면 기원전 4000년대가 나오지만(어셔 연대) 이를 역사 연표로 쓰지 않는 견해가 일반적이다. 시대로 표시하지 않고 '연대 미상' 버킷으로 두고, 지역 블롭도 그리지 않는 쪽을 택했다."
+    },
+    {
+      "id": "patriarchs",
+      "ko": "족장 시대",
+      "en": "Patriarchs",
+      "approx": "기원전 2000–1700년경",
+      "approx_from": -2000,
+      "approx_to": -1700,
+      "caption": "아브라함 일가는 메소포타미아 남부(우르)에서 하란을 거쳐 가나안으로 내려온다. 가나안은 통일된 나라가 아니라 세겜·벧엘·헤브론 같은 성읍들이 흩어진 땅이었고, 남쪽 애굽은 이미 강한 왕국이었다.",
+      "polities": [
+        {
+          "ko": "가나안 성읍들",
+          "en": "Canaan (city-states)",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Canaan",
+            "Shechem",
+            "Bethel 1",
+            "Hebron",
+            "Beersheba 1",
+            "Gerar",
+            "Sodom",
+            "Gomorrah"
+          ]
+        },
+        {
+          "ko": "애굽",
+          "en": "Egypt",
+          "kind": "kingdom",
+          "render": "label_only",
+          "label_at": [
+            31.25,
+            29.95
+          ],
+          "label_note": "나일 삼각주 꼭짓점(멤피스·고센 부근). 애굽의 무게중심은 강줄기인데 강 자료가 없고, 바돌로(24.1°N)까지 감싼 껍질은 land.json 의 자료 경계 24°N 에서 자로 그은 듯 잘렸다. 그래서 이름만 둔다.",
+          "anchor_places_en": [
+            "Egypt",
+            "Goshen 1",
+            "Zoan",
+            "Pathros"
+          ]
+        },
+        {
+          "ko": "메소포타미아(우르·하란)",
+          "en": "Mesopotamia",
+          "kind": "region",
+          "render": "label_only",
+          "label_at": [
+            40.9,
+            34.6
+          ],
+          "label_note": "우르(46.1E)–하란(39.0E) 직선의 중점은 시리아 사막 한복판이다. 아브람이 실제로 따라간 길인 유프라테스 강변(마리 부근)에 이름을 둔다. 껍질은 길이 800km 바늘이 되어 버렸다.",
+          "anchor_places_en": [
+            "Ur 1",
+            "Chaldea",
+            "Haran",
+            "Paddan-aram",
+            "Shinar"
+          ]
+        },
+        {
+          "ko": "에돔·세일",
+          "en": "Edom / Seir",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Edom",
+            "Mount Seir 1",
+            "Bozrah 1",
+            "Teman"
+          ]
+        },
+        {
+          "ko": "미디안·아라비아",
+          "en": "Midian / Arabia",
+          "kind": "region",
+          "render": "label_only",
+          "label_at": [
+            37.5,
+            27.6
+          ],
+          "label_note": "데단·데마의 북아라비아 대상로 부근. 미디안·데단·데마·게달을 이은 껍질은 홍해와 아카바만을 가로지르는 123,000km² 삼각형이었다 — 어떤 부족연합의 모양도 아니다.",
+          "anchor_places_en": [
+            "Midian",
+            "Dedan",
+            "Tema",
+            "Kedar"
+          ]
+        }
+      ],
+      "note": "족장 연대는 학설 차가 크다. 왕상 6:1의 480년과 출 12:40의 430년을 문자대로 소급하면 아브라함은 기원전 2100년경, 고고학적으로 중기청동기(MB II, 2000–1550)에 두는 견해가 일반적이며, 아예 연대를 매기지 않는 견해도 있다. 여기서는 2000–1700년경을 폭으로 잡았다. 창세기의 '블레셋'(그랄)은 후대 명칭이 소급된 것으로 보아 이 시대 정치체에 넣지 않았다."
+    },
+    {
+      "id": "exodus_wilderness",
+      "ko": "출애굽·광야 시대",
+      "en": "Exodus and Wilderness",
+      "approx": "기원전 15세기 또는 13세기 (1446년경 / 1260년경)",
+      "approx_from": -1450,
+      "approx_to": -1210,
+      "caption": "무대는 애굽 삼각주(고센·라암셋)에서 시내 반도, 가데스 바네아, 그리고 요단 동편으로 이어진다. 가는 길목마다 에돔·모압·아모리 같은 작은 왕국들이 통과를 막는다.",
+      "polities": [
+        {
+          "ko": "애굽",
+          "en": "Egypt",
+          "kind": "kingdom",
+          "render": "label_only",
+          "label_at": [
+            31.25,
+            29.95
+          ],
+          "label_note": "나일 삼각주 꼭짓점(멤피스·고센 부근). 애굽의 무게중심은 강줄기인데 강 자료가 없고, 바돌로(24.1°N)까지 감싼 껍질은 land.json 의 자료 경계 24°N 에서 자로 그은 듯 잘렸다. 그래서 이름만 둔다.",
+          "anchor_places_en": [
+            "Egypt",
+            "Rameses",
+            "Pithom",
+            "Goshen 1",
+            "Succoth 2",
+            "Migdol 1",
+            "Zoan"
+          ]
+        },
+        {
+          "ko": "시내·광야",
+          "en": "Sinai and the wilderness",
+          "kind": "region",
+          "render": "blob",
+          "label_note": "유일하게 '유랑의 영역'으로 정직한 블롭. 앵커 6개(시내산·르비딤·엘림·마라·하세롯·가데스바네아)가 시내 반도 안에 촘촘하고, 이 시대의 무대 자체가 '광야'라서 덩이가 곧 내용이다.",
+          "anchor_places_en": [
+            "Mount Sinai",
+            "Rephidim",
+            "Elim",
+            "Marah",
+            "Hazeroth",
+            "Kadesh-barnea"
+          ]
+        },
+        {
+          "ko": "미디안",
+          "en": "Midian",
+          "kind": "region",
+          "render": "label_only",
+          "label_at": [
+            35.01,
+            28.5
+          ],
+          "label_note": "아카바만 동쪽. 앵커가 미디안·에시온게벨 둘뿐이라 껍질이 아카바만을 가로지르는 캡슐이 된다.",
+          "anchor_places_en": [
+            "Midian",
+            "Ezion-geber"
+          ]
+        },
+        {
+          "ko": "아말렉",
+          "en": "Amalek",
+          "kind": "people",
+          "render": "label_only",
+          "label_at": [
+            34.5,
+            30.6
+          ],
+          "label_note": "네게브(가데스바네아 부근). 아말렉은 영역을 가진 나라가 아니라 유목 민족이고, 고유 앵커가 Amalek=Kadesh-barnea 한 점뿐이다(좌표 동일). 덩이를 그리면 없는 국경이 생긴다.",
+          "anchor_places_en": [
+            "Amalek",
+            "Rephidim",
+            "Kadesh-barnea"
+          ]
+        },
+        {
+          "ko": "에돔",
+          "en": "Edom",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Edom",
+            "Mount Seir 1",
+            "Punon",
+            "Oboth",
+            "Bozrah 1"
+          ]
+        },
+        {
+          "ko": "모압",
+          "en": "Moab",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Moab 1",
+            "Dibon 1",
+            "Mount Nebo",
+            "Ir-moab",
+            "Abel-shittim"
+          ]
+        },
+        {
+          "ko": "아모리·바산",
+          "en": "Amorites and Bashan",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Heshbon",
+            "Jahaz",
+            "Bashan",
+            "Edrei 1",
+            "Ashtaroth"
+          ]
+        },
+        {
+          "ko": "가나안",
+          "en": "Canaan",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Canaan",
+            "Jericho 1",
+            "Arad 1",
+            "Hormah",
+            "Hebron"
+          ]
+        }
+      ],
+      "note": "출애굽 연대가 이 프로젝트에서 가장 크게 갈리는 지점이다. 이른 연대(왕상 6:1 기준 1446년경)와 늦은 연대(라암셋 건설, 람세스 2세 기준 1260년경)가 200년 가까이 차이 난다. 어느 한쪽을 고르지 않고 두 설을 모두 적어 폭으로 표시한다. 시내산 위치(시내 반도 남부 전승 vs 미디안/아라비아 설)도 확정된 것이 아니다."
+    },
+    {
+      "id": "conquest_judges",
+      "ko": "정복·사사 시대",
+      "en": "Conquest and Judges",
+      "approx": "기원전 1400–1050년경 (늦은 연대로는 1200–1050년경)",
+      "approx_from": -1400,
+      "approx_to": -1050,
+      "caption": "이스라엘은 아직 나라가 아니라 지파들의 느슨한 연합이고, 중심지는 실로다. 해안에는 블레셋 다섯 도시, 골짜기에는 하솔·므깃도 같은 가나안 성읍이 그대로 남아 있어 땅이 얼룩덜룩하게 나뉘어 있었다.",
+      "polities": [
+        {
+          "ko": "이스라엘 지파 연합",
+          "en": "Israelite tribes",
+          "kind": "confederation",
+          "render": "blob",
+          "anchor_places_en": [
+            "Shiloh",
+            "Shechem",
+            "Bethel 1",
+            "Gilgal 1",
+            "Hebron",
+            "Mount Tabor",
+            "Beersheba 1"
+          ]
+        },
+        {
+          "ko": "블레셋 다섯 도시",
+          "en": "Philistine pentapolis",
+          "kind": "city-league",
+          "render": "blob",
+          "anchor_places_en": [
+            "Gaza",
+            "Ashkelon",
+            "Ashdod",
+            "Ekron",
+            "Gath 1"
+          ]
+        },
+        {
+          "ko": "가나안 성읍국가",
+          "en": "Canaanite city-states",
+          "kind": "city-states",
+          "render": "blob",
+          "anchor_places_en": [
+            "Hazor 1",
+            "Megiddo",
+            "Taanach",
+            "Jokneam",
+            "Gezer",
+            "Beth-shan"
+          ]
+        },
+        {
+          "ko": "페니키아(두로·시돈)",
+          "en": "Phoenicia",
+          "kind": "city-league",
+          "render": "blob",
+          "anchor_places_en": [
+            "Tyre",
+            "Sidon",
+            "Zarephath",
+            "Lebanon"
+          ]
+        },
+        {
+          "ko": "요단 동편 왕국들(모압·암몬·에돔)",
+          "en": "Transjordan kingdoms",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Moab 1",
+            "Ammon",
+            "Edom",
+            "Heshbon",
+            "Rabbah 1",
+            "Dibon 1"
+          ]
+        },
+        {
+          "ko": "미디안",
+          "en": "Midian",
+          "kind": "people",
+          "render": "label_only",
+          "label_at": [
+            35.01,
+            28.5
+          ],
+          "label_note": "삿 6:3 의 '미디안과 아말렉과 동방 사람들'을 미디안·아말렉으로 나눴다. 미디안은 아카바만 동쪽, 아말렉은 네게브로 250km 떨어져 있어 한 덩이로 묶으면 아카바만을 가로지르고, 원 두 개로 두면 라벨이 한쪽에만 붙었다.",
+          "anchor_places_en": [
+            "Midian"
+          ]
+        },
+        {
+          "ko": "아말렉",
+          "en": "Amalek",
+          "kind": "people",
+          "render": "label_only",
+          "label_at": [
+            34.5,
+            30.6
+          ],
+          "label_note": "네게브(가데스바네아 부근).",
+          "anchor_places_en": [
+            "Amalek",
+            "Kadesh-barnea"
+          ]
+        }
+      ],
+      "note": "정복의 시작 연대는 출애굽 연대를 그대로 따라간다(이른 연대 1400년경, 늦은 연대 1200년경). 사사들의 재위 연수를 단순히 더하면 성경 내부 합계가 이 폭보다 길어지는데, 지파별로 겹쳐 활동한 것으로 보는 견해가 일반적이다. 사사기 자체가 연대순이 아니다."
+    },
+    {
+      "id": "united_kingdom",
+      "ko": "통일왕국 시대",
+      "en": "United Kingdom",
+      "approx": "기원전 1050–930년경",
+      "approx_from": -1050,
+      "approx_to": -930,
+      "caption": "사울·다윗·솔로몬 아래 열두 지파가 한 나라가 되고, 수도가 헤브론에서 예루살렘으로 옮겨진다. 이스라엘이 가장 넓었던 때로, 북쪽 아람과 남쪽 에돔까지 영향이 미치고 두로와는 무역으로 이어져 있었다.",
+      "polities": [
+        {
+          "ko": "이스라엘 통일왕국",
+          "en": "Israel (United Kingdom)",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Jerusalem",
+            "Hebron",
+            "Shechem",
+            "Beersheba 1",
+            "Dan",
+            "Megiddo",
+            "Gezer",
+            "Mahanaim"
+          ]
+        },
+        {
+          "ko": "블레셋",
+          "en": "Philistia",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Gaza",
+            "Ashkelon",
+            "Ashdod",
+            "Ekron",
+            "Gath 1"
+          ]
+        },
+        {
+          "ko": "페니키아(두로)",
+          "en": "Phoenicia (Tyre)",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Tyre",
+            "Sidon",
+            "Gebal 1"
+          ]
+        },
+        {
+          "ko": "아람(다메섹·소바)",
+          "en": "Aram (Damascus, Zobah)",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Damascus",
+            "Syria 1",
+            "Zobah",
+            "Hamath 1"
+          ]
+        },
+        {
+          "ko": "모압",
+          "en": "Moab",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Moab 1",
+            "Dibon 1",
+            "Ir-moab"
+          ]
+        },
+        {
+          "ko": "암몬",
+          "en": "Ammon",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Ammon",
+            "Rabbah 1",
+            "Heshbon"
+          ]
+        },
+        {
+          "ko": "에돔",
+          "en": "Edom",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Edom",
+            "Bozrah 1",
+            "Mount Seir 1",
+            "Ezion-geber",
+            "Teman"
+          ]
+        },
+        {
+          "ko": "애굽",
+          "en": "Egypt",
+          "kind": "kingdom",
+          "render": "label_only",
+          "label_at": [
+            31.25,
+            29.95
+          ],
+          "label_note": "나일 삼각주 꼭짓점(멤피스·고센 부근). 애굽의 무게중심은 강줄기인데 강 자료가 없고, 바돌로(24.1°N)까지 감싼 껍질은 land.json 의 자료 경계 24°N 에서 자로 그은 듯 잘렸다. 그래서 이름만 둔다.",
+          "anchor_places_en": [
+            "Egypt",
+            "Zoan",
+            "Goshen 1"
+          ]
+        }
+      ],
+      "note": "분열 시점(기원전 931/930)은 비교적 안정적인 고정점이고, 여기서 거슬러 올라가 솔로몬 970–931, 다윗 1010–970, 사울 1050–1010으로 잡는 것이 통상적이다(틸레/갤릴 계열 연대). 사울의 재위 기간은 본문(삼상 13:1)이 손상되어 확정할 수 없다."
+    },
+    {
+      "id": "divided_kingdom",
+      "ko": "분열왕국 시대",
+      "en": "Divided Kingdom",
+      "approx": "기원전 930–586년경",
+      "approx_from": -930,
+      "approx_to": -586,
+      "caption": "솔로몬 이후 나라가 북이스라엘(수도 사마리아)과 남유다(수도 예루살렘)로 갈라진다. 북쪽에는 아람-다메섹이 붙어 있고, 기원전 8세기부터는 앗수르가, 7세기 말부터는 바벨론이 이 땅 전체를 눌러온다.",
+      "polities": [
+        {
+          "ko": "북이스라엘",
+          "en": "Israel (Northern Kingdom)",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Samaria 1",
+            "Jezreel 2",
+            "Dan",
+            "Bethel 1",
+            "Tirzah",
+            "Shechem",
+            "Megiddo",
+            "Ramoth-gilead"
+          ]
+        },
+        {
+          "ko": "남유다",
+          "en": "Judah (Southern Kingdom)",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Jerusalem",
+            "Hebron",
+            "Lachish",
+            "Beersheba 1",
+            "Bethlehem 1",
+            "Tekoa",
+            "Libnah 1"
+          ]
+        },
+        {
+          "ko": "아람-다메섹",
+          "en": "Aram-Damascus",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Damascus",
+            "Syria 1",
+            "Hamath 1",
+            "Ramoth-gilead"
+          ]
+        },
+        {
+          "ko": "앗수르 제국",
+          "en": "Assyrian Empire",
+          "kind": "empire",
+          "render": "label_only",
+          "label_at": [
+            43.15,
+            36.36
+          ],
+          "label_note": "니느웨. 니느웨–갈그미스–고산 껍질은 길이 600km 폭 100km 바늘이었다.",
+          "anchor_places_en": [
+            "Assyria",
+            "Nineveh",
+            "Asshur",
+            "Carchemish",
+            "Haran",
+            "Gozan",
+            "Arpad"
+          ]
+        },
+        {
+          "ko": "바벨론 제국(후기)",
+          "en": "Babylonian Empire (late)",
+          "kind": "empire",
+          "render": "label_only",
+          "label_at": [
+            44.42,
+            32.54
+          ],
+          "label_note": "바벨론. 바벨론–갈그미스 900km 대각선이 시리아 사막을 관통했다.",
+          "anchor_places_en": [
+            "Babylon 1",
+            "Chaldea",
+            "Shinar",
+            "Carchemish"
+          ]
+        },
+        {
+          "ko": "블레셋",
+          "en": "Philistia",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Gaza",
+            "Ashkelon",
+            "Ashdod",
+            "Ekron",
+            "Gath 1"
+          ]
+        },
+        {
+          "ko": "요단 동편 왕국들(모압·암몬·에돔)",
+          "en": "Transjordan kingdoms",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Moab 1",
+            "Dibon 1",
+            "Ammon",
+            "Rabbah 1",
+            "Edom",
+            "Bozrah 1"
+          ]
+        },
+        {
+          "ko": "애굽",
+          "en": "Egypt",
+          "kind": "kingdom",
+          "render": "label_only",
+          "label_at": [
+            31.25,
+            29.95
+          ],
+          "label_note": "나일 삼각주 꼭짓점(멤피스·고센 부근). 애굽의 무게중심은 강줄기인데 강 자료가 없고, 바돌로(24.1°N)까지 감싼 껍질은 land.json 의 자료 경계 24°N 에서 자로 그은 듯 잘렸다. 그래서 이름만 둔다.",
+          "anchor_places_en": [
+            "Egypt",
+            "Zoan",
+            "Tahpanhes",
+            "Pathros"
+          ]
+        }
+      ],
+      "note": "이 시대의 왕 연대는 틸레(E. R. Thiele)의 공동섭정 체계를 따르는 것이 표준에 가깝고, 여기서도 그 틀을 쓴다. 고정점: 사마리아 함락 722, 산헤립의 예루살렘 포위 701, 예루살렘 함락 586. 북이스라엘은 722년에 끝나므로 이 시대 후반(722–586)에는 남유다만 남는다 — 지도에서 북이스라엘 블록을 언제 지울지는 장 단위로 구분하지 않았다(한계)."
+    },
+    {
+      "id": "exile",
+      "ko": "포로 시대",
+      "en": "Babylonian Exile",
+      "approx": "기원전 586–539년경 (1차 유배는 605년)",
+      "approx_from": -605,
+      "approx_to": -539,
+      "caption": "예루살렘이 무너지고 유다 사람들이 바벨론으로 끌려간다. 무대가 처음으로 둘로 나뉘어, 한쪽은 황폐해진 유다(중심은 미스바)이고 다른 쪽은 그발 강가의 유배지다.",
+      "polities": [
+        {
+          "ko": "신바벨론 제국",
+          "en": "Neo-Babylonian Empire",
+          "kind": "empire",
+          "render": "label_only",
+          "label_at": [
+            44.42,
+            32.54
+          ],
+          "label_note": "바벨론. 앵커가 바벨로니아 본토에 모여 있어 껍질 자체는 멀쩡했지만(42,912km²), 그 타원은 신바벨론 제국의 1/10도 안 된다. 제국을 작게 그리면 거짓말이 되므로 이름만 둔다.",
+          "anchor_places_en": [
+            "Babylon 1",
+            "Chaldea",
+            "Shinar",
+            "Tel-abib",
+            "Chebar"
+          ]
+        },
+        {
+          "ko": "황폐한 유다",
+          "en": "Judah (devastated)",
+          "kind": "province",
+          "render": "blob",
+          "anchor_places_en": [
+            "Jerusalem",
+            "Mizpah 3",
+            "Lachish",
+            "Bethlehem 1"
+          ]
+        },
+        {
+          "ko": "에돔",
+          "en": "Edom",
+          "kind": "kingdom",
+          "render": "blob",
+          "anchor_places_en": [
+            "Edom",
+            "Bozrah 1",
+            "Teman",
+            "Mount Seir 1"
+          ]
+        },
+        {
+          "ko": "애굽",
+          "en": "Egypt",
+          "kind": "kingdom",
+          "render": "label_only",
+          "label_at": [
+            31.25,
+            29.95
+          ],
+          "label_note": "나일 삼각주 꼭짓점(멤피스·고센 부근). 애굽의 무게중심은 강줄기인데 강 자료가 없고, 바돌로(24.1°N)까지 감싼 껍질은 land.json 의 자료 경계 24°N 에서 자로 그은 듯 잘렸다. 그래서 이름만 둔다.",
+          "anchor_places_en": [
+            "Egypt",
+            "Tahpanhes",
+            "Migdol 1",
+            "Pathros",
+            "Zoan"
+          ]
+        },
+        {
+          "ko": "메디아",
+          "en": "Media",
+          "kind": "kingdom",
+          "render": "label_only",
+          "label_at": [
+            48.52,
+            34.81
+          ],
+          "label_note": "엑바타나(하마단). places.json 에서 Media=Ecbatana=Persia 가 모두 같은 좌표라 메디아 원이 페르시아 캡슐 위에 정확히 포개졌다. 메디아는 엑바타나, 페르시아는 수사로 떼어 놓는다.",
+          "anchor_places_en": [
+            "Media",
+            "Ecbatana"
+          ]
+        },
+        {
+          "ko": "페르시아(신흥)",
+          "en": "Persia (rising)",
+          "kind": "kingdom",
+          "render": "label_only",
+          "label_at": [
+            48.26,
+            32.19
+          ],
+          "label_note": "수사. 위 메디아와 290km 떨어뜨렸다. 페르세폴리스(52.9E)가 더 맞지만 지리 자료 bbox(경도 50) 밖이다.",
+          "anchor_places_en": [
+            "Persia",
+            "Susa",
+            "Elam"
+          ]
+        },
+        {
+          "ko": "두로·페니키아",
+          "en": "Tyre and Phoenicia",
+          "kind": "city-league",
+          "render": "blob",
+          "anchor_places_en": [
+            "Tyre",
+            "Sidon",
+            "Phoenicia"
+          ]
+        }
+      ],
+      "note": "유배는 한 번이 아니라 605·597·586년 세 차례로 본다. 끝은 고레스의 바벨론 정복(539)과 귀환 칙령(538)이다. 시작을 586으로 잡으면 다니엘 1장(605)과 에스겔의 첫 환상(593)이 앞서 버리므로, 숫자 범위는 605부터 잡고 표시 문구는 586–539로 둔다."
+    },
+    {
+      "id": "return",
+      "ko": "귀환·페르시아 시대",
+      "en": "Return and Persian Period",
+      "approx": "기원전 539–332년경",
+      "approx_from": -539,
+      "approx_to": -332,
+      "caption": "페르시아가 바벨론을 대신하면서 유다 사람들이 돌아와 성전과 성벽을 다시 세운다. 유다는 이제 독립국이 아니라 페르시아 제국의 작은 속주(예후드)이고, 북쪽 사마리아와 동쪽 암몬이 그 일을 방해한다.",
+      "polities": [
+        {
+          "ko": "페르시아 제국",
+          "en": "Persian Empire",
+          "kind": "empire",
+          "render": "label_only",
+          "label_at": [
+            48.26,
+            32.19
+          ],
+          "label_note": "수사. 수사–엑바타나–바벨론 삼각형은 실제 제국의 1/10도 안 된다.",
+          "anchor_places_en": [
+            "Persia",
+            "Susa",
+            "Ecbatana",
+            "Babylon 1",
+            "Elam",
+            "Media"
+          ]
+        },
+        {
+          "ko": "예후드(유다) 속주",
+          "en": "Yehud (Judah) province",
+          "kind": "province",
+          "render": "blob",
+          "anchor_places_en": [
+            "Jerusalem",
+            "Bethlehem 1",
+            "Jericho 1",
+            "Mizpah 3",
+            "Tekoa"
+          ]
+        },
+        {
+          "ko": "사마리아 속주",
+          "en": "Samaria province",
+          "kind": "province",
+          "render": "blob",
+          "anchor_places_en": [
+            "Samaria 1",
+            "Shechem",
+            "Mount Gerizim"
+          ]
+        },
+        {
+          "ko": "암몬",
+          "en": "Ammon",
+          "kind": "region",
+          "render": "blob",
+          "label_note": "느 2:19 의 '암몬 사람 도비야'와 '아라비아 사람 게셈'은 서로 다른 세력이다. 암몬(랍바)은 요단 동편 레반트라 덩이로 남기고, 아라비아는 이름만 둔다.",
+          "anchor_places_en": [
+            "Ammon",
+            "Rabbah 1"
+          ]
+        },
+        {
+          "ko": "아라비아(게셈)",
+          "en": "Arabia (Geshem)",
+          "kind": "people",
+          "render": "label_only",
+          "label_at": [
+            35.35,
+            30.07
+          ],
+          "label_note": "게셈은 게달 부족연합 쪽으로 보지만, 게달의 OpenBible 좌표는 나푸드 사막 한복판 점 하나다. 성경 지명으로 확인되는 가장 가까운 곳(Arabia 2, 페트라 부근)에 이름을 둔다.",
+          "anchor_places_en": [
+            "Arabia 2",
+            "Kedar"
+          ]
+        },
+        {
+          "ko": "이두매(에돔)",
+          "en": "Idumea",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Idumea",
+            "Hebron",
+            "Edom",
+            "Bozrah 1"
+          ]
+        },
+        {
+          "ko": "애굽",
+          "en": "Egypt",
+          "kind": "province",
+          "render": "label_only",
+          "label_at": [
+            31.25,
+            29.95
+          ],
+          "label_note": "나일 삼각주 꼭짓점(멤피스·고센 부근). 애굽의 무게중심은 강줄기인데 강 자료가 없고, 바돌로(24.1°N)까지 감싼 껍질은 land.json 의 자료 경계 24°N 에서 자로 그은 듯 잘렸다. 그래서 이름만 둔다.",
+          "anchor_places_en": [
+            "Egypt",
+            "Zoan",
+            "Alexandria"
+          ]
+        },
+        {
+          "ko": "해안 도시(아스돗 등)",
+          "en": "Coastal cities",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Ashdod",
+            "Gaza",
+            "Joppa",
+            "Ashkelon"
+          ]
+        }
+      ],
+      "note": "고정점: 고레스 칙령 538, 성전 재건 완공 515, 에스라의 귀환 458(또는 398), 느헤미야 445. 에스라와 느헤미야의 선후 관계는 오래된 논쟁이며 여기서 정하지 않는다. 에스더는 크세르크세스 1세(아하수에로, 486–465) 때로 본다. 알렉산드로스의 정복(332) 이후 헬라 시대는 정경에 해당하는 책이 없어 별도 시대로 두지 않았다."
+    },
+    {
+      "id": "new_testament",
+      "ko": "신약 시대(예수·로마)",
+      "en": "New Testament (Jesus under Rome)",
+      "approx": "기원전 4년–기원후 30년경",
+      "approx_from": -4,
+      "approx_to": 30,
+      "caption": "팔레스타인 전체가 로마의 지배 아래 있고, 헤롯 가문과 로마 총독이 지역을 나눠 다스린다. 예수의 활동 무대는 갈릴리 호수 주변과 예루살렘이며, 그 사이의 사마리아는 유대인들이 피해 가던 땅이었다.",
+      "polities": [
+        {
+          "ko": "유대",
+          "en": "Judea",
+          "kind": "province",
+          "render": "blob",
+          "anchor_places_en": [
+            "Judea 1",
+            "Jerusalem",
+            "Jericho 1",
+            "Bethany 1",
+            "Bethphage",
+            "Bethlehem 1"
+          ]
+        },
+        {
+          "ko": "갈릴리",
+          "en": "Galilee",
+          "kind": "tetrarchy",
+          "render": "blob",
+          "anchor_places_en": [
+            "Galilee 1",
+            "Nazareth",
+            "Capernaum",
+            "Cana",
+            "Sea of Galilee",
+            "Tiberias",
+            "Chorazin",
+            "Bethsaida 1"
+          ]
+        },
+        {
+          "ko": "사마리아",
+          "en": "Samaria",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Samaria 1",
+            "Sychar",
+            "Shechem",
+            "Mount Gerizim"
+          ]
+        },
+        {
+          "ko": "데가볼리",
+          "en": "Decapolis",
+          "kind": "city-league",
+          "render": "blob",
+          "anchor_places_en": [
+            "Decapolis",
+            "Gadara",
+            "Gerasa",
+            "Beth-shan"
+          ]
+        },
+        {
+          "ko": "베레아(요단 동편)",
+          "en": "Perea",
+          "kind": "tetrarchy",
+          "render": "blob",
+          "label_note": "앵커가 숙곳·아벨싯딤·헤스본 셋뿐이라 가장 약하다. 그래도 요단 동편 한 줄기 안에 모여 있고 레반트 코어라 덩이를 유지한다.",
+          "anchor_places_en": [
+            "Succoth 1",
+            "Abel-shittim",
+            "Heshbon"
+          ]
+        },
+        {
+          "ko": "이두매",
+          "en": "Idumea",
+          "kind": "region",
+          "render": "blob",
+          "anchor_places_en": [
+            "Idumea",
+            "Hebron",
+            "Beersheba 1"
+          ]
+        },
+        {
+          "ko": "수리아(로마 속주)",
+          "en": "Syria (Roman province)",
+          "kind": "province",
+          "render": "blob",
+          "label_note": "경계선: 안디옥(36.2N)까지 올라가는 해안 띠라 남북 500km로 길다. 그래도 앵커 6개가 전부 레반트 해안선 위에 한 줄로 있고, 실제 수리아 속주도 그 띠를 포함한다. 덩이 유지.",
+          "anchor_places_en": [
+            "Syria 1",
+            "Damascus",
+            "Antioch 1",
+            "Sidon",
+            "Tyre",
+            "Caesarea Philippi"
+          ]
+        },
+        {
+          "ko": "애굽",
+          "en": "Egypt",
+          "kind": "province",
+          "render": "label_only",
+          "label_at": [
+            31.25,
+            29.95
+          ],
+          "label_note": "나일 삼각주 꼭짓점(멤피스·고센 부근). 애굽의 무게중심은 강줄기인데 강 자료가 없고, 바돌로(24.1°N)까지 감싼 껍질은 land.json 의 자료 경계 24°N 에서 자로 그은 듯 잘렸다. 그래서 이름만 둔다.",
+          "anchor_places_en": [
+            "Egypt",
+            "Alexandria",
+            "Zoan"
+          ]
+        }
+      ],
+      "note": "예수의 탄생은 헤롯 대왕의 사망(기원전 4년) 이전이어야 하므로 기원전 6–4년경으로 본다. 십자가 사건은 기원후 30년 또는 33년으로 갈리며(유월절 요일 계산 차이), 여기서는 30년경으로 적되 확정하지 않는다. 베레아는 성경에 그 이름으로 나오지 않아(요단 건너편으로만 불린다) 앵커가 약하다 — 숙곳·헤스본 근처로 대강 잡았다."
+    },
+    {
+      "id": "early_church",
+      "ko": "초대교회·서신 시대",
+      "en": "Early Church and Epistles",
+      "approx": "기원후 30–100년경",
+      "approx_from": 30,
+      "approx_to": 100,
+      "caption": "무대가 팔레스타인을 벗어나 지중해 전체로 넓어진다. 로마의 도로와 항로를 따라 안디옥·에베소·고린도·로마 같은 큰 도시로 이동하므로, 이 시대 지도는 나라가 아니라 로마의 속주들로 보는 편이 맞다.",
+      "polities": [
+        {
+          "ko": "로마·이탈리아",
+          "en": "Rome and Italy",
+          "kind": "empire",
+          "render": "label_only",
+          "label_at": [
+            12.49,
+            41.89
+          ],
+          "label_note": "로마.",
+          "anchor_places_en": [
+            "Rome",
+            "Italy",
+            "Puteoli",
+            "Forum of Appius",
+            "Three Taverns",
+            "Rhegium",
+            "Syracuse"
+          ]
+        },
+        {
+          "ko": "유대·팔레스타인",
+          "en": "Judea and Palestine",
+          "kind": "province",
+          "render": "blob",
+          "anchor_places_en": [
+            "Jerusalem",
+            "Caesarea",
+            "Joppa",
+            "Lod",
+            "Samaria 1"
+          ]
+        },
+        {
+          "ko": "수리아·길리기아",
+          "en": "Syria and Cilicia",
+          "kind": "province",
+          "render": "label_only",
+          "label_at": [
+            36.17,
+            36.23
+          ],
+          "label_note": "수리아 안디옥. 안디옥–다소–다메섹 껍질은 아마누스 산맥을 넘어 레반트와 아나톨리아를 한 덩이로 묶고 두 조각으로 깨졌다. 레반트 코어를 벗어나므로 이름만 둔다.",
+          "anchor_places_en": [
+            "Syria 1",
+            "Antioch 1",
+            "Seleucia",
+            "Damascus",
+            "Tarsus",
+            "Cilicia"
+          ]
+        },
+        {
+          "ko": "아시아 속주",
+          "en": "Asia (province)",
+          "kind": "province",
+          "render": "label_only",
+          "label_at": [
+            27.34,
+            37.94
+          ],
+          "label_note": "에베소.",
+          "anchor_places_en": [
+            "Asia",
+            "Ephesus",
+            "Smyrna",
+            "Pergamum",
+            "Thyatira",
+            "Sardis",
+            "Philadelphia",
+            "Laodicea",
+            "Troas",
+            "Miletus",
+            "Hierapolis"
+          ]
+        },
+        {
+          "ko": "갈라디아·내륙 소아시아",
+          "en": "Galatia and inland Asia Minor",
+          "kind": "province",
+          "render": "label_only",
+          "label_at": [
+            32.49,
+            37.87
+          ],
+          "label_note": "이고니온. 바울이 실제로 다닌 남갈라디아(비시디아 안디옥–이고니온–루스드라–더베)의 중간이다. 갈라디아 속주 좌표(앙카라)는 그가 간 적 없는 북쪽이다.",
+          "anchor_places_en": [
+            "Galatia",
+            "Antioch 2",
+            "Iconium",
+            "Lystra",
+            "Derbe",
+            "Pisidia",
+            "Phrygia",
+            "Lycaonia",
+            "Cappadocia"
+          ]
+        },
+        {
+          "ko": "마게도냐",
+          "en": "Macedonia",
+          "kind": "province",
+          "render": "label_only",
+          "label_at": [
+            22.95,
+            40.64
+          ],
+          "label_note": "데살로니가.",
+          "anchor_places_en": [
+            "Macedonia",
+            "Philippi",
+            "Thessalonica",
+            "Berea",
+            "Amphipolis"
+          ]
+        },
+        {
+          "ko": "아가야",
+          "en": "Achaia",
+          "kind": "province",
+          "render": "label_only",
+          "label_at": [
+            22.88,
+            37.91
+          ],
+          "label_note": "고린도.",
+          "anchor_places_en": [
+            "Achaia",
+            "Corinth",
+            "Athens",
+            "Cenchreae"
+          ]
+        },
+        {
+          "ko": "지중해 섬들",
+          "en": "Mediterranean islands",
+          "kind": "region",
+          "render": "label_only",
+          "label_at": [
+            24.89,
+            35.31
+          ],
+          "label_note": "그레데. 구브로·그레데·멜리데·밧모·로도는 2,000km 에 흩어져 있어 한 이름으로 묶을 모양이 없다. 항해의 한가운데인 그레데에 이름만 둔다.",
+          "anchor_places_en": [
+            "Cyprus",
+            "Salamis",
+            "Paphos",
+            "Crete",
+            "Fair Havens",
+            "Malta",
+            "Patmos",
+            "Rhodes 2"
+          ]
+        },
+        {
+          "ko": "애굽·구레네",
+          "en": "Egypt and Cyrene",
+          "kind": "province",
+          "render": "label_only",
+          "label_at": [
+            29.9,
+            31.18
+          ],
+          "label_note": "알렉산드리아. 이 시대의 애굽은 삼각주가 아니라 알렉산드리아다. 구레네(리비아)까지 한 덩이로 묶을 수는 없다.",
+          "anchor_places_en": [
+            "Egypt",
+            "Alexandria",
+            "Cyrene"
+          ]
+        }
+      ],
+      "note": "바울의 이동 연대는 갈리오 비문(고린도, 기원후 51–52년경)을 고정점으로 삼는 것이 일반적이다. 요한계시록은 도미티아누스 말기(95년경)로 보는 견해가 다수지만 네로 시대(68년경)로 보는 견해도 있다. 로마 제국 자체는 지도 범위를 훨씬 넘으므로 블롭으로 그리지 않고 이탈리아 일대만 표시한다."
+    },
+    {
+      "id": "undated",
+      "ko": "시대 불특정",
+      "en": "Undated",
+      "approx": "특정 시대에 매기지 않음",
+      "approx_from": null,
+      "approx_to": null,
+      "undated": true,
+      "caption": "이 책은 한 시대에 묶기 어렵다. 장마다 배경이 달라서 시대 구분과 나라 표시를 하지 않는다.",
+      "polities": [],
+      "note": "시편(여러 시대의 시가 모인 편집물, 포로기 시편 포함)·욥기(배경은 족장 시대풍이나 저작·사건 연대 미상)·족보 장(대상 1–9)에 쓴다. UI는 이 시대일 때 캡션과 지역 블롭을 숨기면 된다."
+    }
+  ]
+}

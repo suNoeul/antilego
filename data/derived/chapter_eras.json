@@ -1,0 +1,362 @@
+{
+  "_notes": [
+    "값은 eras.json의 era id. ranges는 [시작장, 끝장, era_id]이며 default보다 우선한다. 범위는 겹치지 않는다.",
+    "어려웠던 판단: (1) 창 1–11은 primeval(연대 미상)로 따로 뺐다. (2) 시편·욥기·대상 1–9는 undated — UI가 캡션을 숨기면 된다. (3) 잠언·전도서·아가는 솔로몬 전승을 따라 통일왕국에 두되 후대설을 note에 적었다. (4) 이사야 40장, 예레미야 39장에서 포로 시대로 넘긴 것은 '장면의 무대' 기준이며 저작자 논쟁과는 무관하다. (5) 사도행전 1–7장만 신약(예수·로마) 시대 지도로 둔다.",
+    "722년 사마리아 함락 이후에도 시대 이름은 '분열왕국'을 유지한다. 장 단위로 북이스라엘의 소멸을 반영하지 않았다 — 알려진 한계.",
+    "예언서는 책의 시대를 하나로 매겼다. 각 예언자의 활동 기간이 시대 경계를 걸치는 경우(예레미야)만 장으로 나눴다."
+  ],
+  "Gen": {
+    "default": "patriarchs",
+    "ranges": [
+      [
+        1,
+        11,
+        "primeval"
+      ]
+    ],
+    "note": "12장 아브람의 부르심에서 족장 시대가 시작된다."
+  },
+  "Exod": {
+    "default": "exodus_wilderness",
+    "ranges": []
+  },
+  "Lev": {
+    "default": "exodus_wilderness",
+    "ranges": [],
+    "note": "시내산 아래 한 지점에 머무는 책이다."
+  },
+  "Num": {
+    "default": "exodus_wilderness",
+    "ranges": []
+  },
+  "Deut": {
+    "default": "exodus_wilderness",
+    "ranges": [],
+    "note": "모압 평지에서의 고별 설교. 무대는 요단 동편 한 곳이다."
+  },
+  "Josh": {
+    "default": "conquest_judges",
+    "ranges": []
+  },
+  "Judg": {
+    "default": "conquest_judges",
+    "ranges": []
+  },
+  "Ruth": {
+    "default": "conquest_judges",
+    "ranges": [],
+    "note": "'사사들이 치리하던 때'(룻 1:1)."
+  },
+  "1Sam": {
+    "default": "united_kingdom",
+    "ranges": [
+      [
+        1,
+        7,
+        "conquest_judges"
+      ]
+    ],
+    "note": "1–7장은 실로와 사무엘, 사사 시대의 끝. 8장 이후 왕정이 시작된다."
+  },
+  "2Sam": {
+    "default": "united_kingdom",
+    "ranges": []
+  },
+  "1Kgs": {
+    "default": "divided_kingdom",
+    "ranges": [
+      [
+        1,
+        11,
+        "united_kingdom"
+      ]
+    ],
+    "note": "12장 르호보암에서 나라가 갈린다."
+  },
+  "2Kgs": {
+    "default": "divided_kingdom",
+    "ranges": [
+      [
+        25,
+        25,
+        "exile"
+      ]
+    ],
+    "note": "25장은 예루살렘 함락과 유배. 17장(사마리아 함락, 722) 이후 북이스라엘은 사라지지만 시대 이름은 그대로 둔다."
+  },
+  "1Chr": {
+    "default": "united_kingdom",
+    "ranges": [
+      [
+        1,
+        9,
+        "undated"
+      ]
+    ],
+    "note": "1–9장 족보는 아담부터 귀환 후까지 여러 시대를 가로지르므로 시대를 매기지 않는다. 10장부터 다윗 이야기."
+  },
+  "2Chr": {
+    "default": "divided_kingdom",
+    "ranges": [
+      [
+        1,
+        9,
+        "united_kingdom"
+      ],
+      [
+        36,
+        36,
+        "exile"
+      ]
+    ],
+    "note": "1–9장 솔로몬, 10장 분열, 36장 함락·유배·고레스 칙령."
+  },
+  "Ezra": {
+    "default": "return",
+    "ranges": []
+  },
+  "Neh": {
+    "default": "return",
+    "ranges": []
+  },
+  "Esth": {
+    "default": "return",
+    "ranges": [],
+    "note": "페르시아 수산 궁, 아하수에로(크세르크세스 1세) 때."
+  },
+  "Job": {
+    "default": "undated",
+    "ranges": [],
+    "note": "배경은 족장 시대 분위기(우스 땅)지만 사건·저작 연대를 매길 근거가 없다."
+  },
+  "Ps": {
+    "default": "undated",
+    "ranges": [],
+    "note": "다윗의 시가 많지만 포로기(시 137) 이후 시까지 모인 편집물이라 한 시대로 묶지 않는다."
+  },
+  "Prov": {
+    "default": "united_kingdom",
+    "ranges": [],
+    "note": "솔로몬 전승을 따라 통일왕국에 둔다. 25장 이후는 히스기야 때 편집(잠 25:1)이고 언어상 후대로 보는 견해도 있다."
+  },
+  "Eccl": {
+    "default": "united_kingdom",
+    "ranges": [],
+    "note": "'다윗의 아들 예루살렘 왕'을 따라 통일왕국에 둔다. 언어학적으로는 페르시아 시대 이후로 보는 견해가 다수다."
+  },
+  "Song": {
+    "default": "united_kingdom",
+    "ranges": [],
+    "note": "솔로몬 전승. 디르사(아 6:4)가 나와 분열왕국 초기를 시사한다는 견해도 있다."
+  },
+  "Isa": {
+    "default": "divided_kingdom",
+    "ranges": [
+      [
+        40,
+        66,
+        "exile"
+      ]
+    ],
+    "note": "1–39장은 앗수르 시대 유다, 40장 이후는 바벨론 포로를 향해 말한다. 저작자 문제와 별개로 '장면의 무대'로 나눴다."
+  },
+  "Jer": {
+    "default": "divided_kingdom",
+    "ranges": [
+      [
+        39,
+        52,
+        "exile"
+      ]
+    ],
+    "note": "39장 예루살렘 함락 이후를 포로 시대로 본다. 예레미야서는 연대순이 아니라서(예: 45장은 605년) 이 경계는 편의상이다."
+  },
+  "Lam": {
+    "default": "exile",
+    "ranges": []
+  },
+  "Ezek": {
+    "default": "exile",
+    "ranges": [],
+    "note": "그발 강가 유배지에서 본 환상."
+  },
+  "Dan": {
+    "default": "exile",
+    "ranges": [],
+    "note": "5장 이후는 바벨론에서 페르시아로 넘어가는 시기지만(다리오·고레스) 무대가 같아 나누지 않았다. 다니엘서의 저작 연대(6세기 vs 기원전 2세기)는 논쟁이 크다."
+  },
+  "Hos": {
+    "default": "divided_kingdom",
+    "ranges": [],
+    "note": "북이스라엘 말기(기원전 8세기)."
+  },
+  "Joel": {
+    "default": "return",
+    "ranges": [],
+    "note": "연대 논쟁이 큰 책이다. 왕이 나오지 않고 성전·성벽이 서 있어 귀환 이후로 보는 견해가 다수지만, 기원전 9세기로 보는 견해도 있다."
+  },
+  "Amos": {
+    "default": "divided_kingdom",
+    "ranges": [],
+    "note": "여로보암 2세 때 북이스라엘(기원전 760년경)."
+  },
+  "Obad": {
+    "default": "exile",
+    "ranges": [],
+    "note": "에돔이 예루살렘 함락을 방관·약탈한 일을 꾸짖는다. 586년 직후로 보는 견해가 다수지만 더 이른 연대를 주장하기도 한다."
+  },
+  "Jonah": {
+    "default": "divided_kingdom",
+    "ranges": [],
+    "note": "앗수르의 니느웨. 이야기의 무대는 여로보암 2세 때(왕하 14:25)로 본다."
+  },
+  "Mic": {
+    "default": "divided_kingdom",
+    "ranges": []
+  },
+  "Nah": {
+    "default": "divided_kingdom",
+    "ranges": [],
+    "note": "니느웨 멸망(612) 직전. 이때 북이스라엘은 이미 없고 남유다만 남아 있다."
+  },
+  "Hab": {
+    "default": "divided_kingdom",
+    "ranges": [],
+    "note": "바벨론이 떠오르던 기원전 605년 전후."
+  },
+  "Zeph": {
+    "default": "divided_kingdom",
+    "ranges": [],
+    "note": "요시야 때(기원전 7세기 후반)."
+  },
+  "Hag": {
+    "default": "return",
+    "ranges": [],
+    "note": "다리오 2년(기원전 520)."
+  },
+  "Zech": {
+    "default": "return",
+    "ranges": []
+  },
+  "Mal": {
+    "default": "return",
+    "ranges": [],
+    "note": "성전 재건 이후. 기원전 5세기 중반으로 본다."
+  },
+  "Matt": {
+    "default": "new_testament",
+    "ranges": []
+  },
+  "Mark": {
+    "default": "new_testament",
+    "ranges": []
+  },
+  "Luke": {
+    "default": "new_testament",
+    "ranges": []
+  },
+  "John": {
+    "default": "new_testament",
+    "ranges": []
+  },
+  "Acts": {
+    "default": "early_church",
+    "ranges": [
+      [
+        1,
+        7,
+        "new_testament"
+      ]
+    ],
+    "note": "1–7장은 예루살렘에 머문다. 8장 사마리아·가이사랴부터 무대가 지중해로 넓어진다."
+  },
+  "Rom": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "1Cor": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "2Cor": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Gal": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Eph": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Phil": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Col": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "1Thess": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "2Thess": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "1Tim": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "2Tim": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Titus": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Phlm": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Heb": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Jas": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "1Pet": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "2Pet": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "1John": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "2John": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "3John": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Jude": {
+    "default": "early_church",
+    "ranges": []
+  },
+  "Rev": {
+    "default": "early_church",
+    "ranges": [],
+    "note": "아시아 일곱 교회. 도미티아누스 말기(95년경)로 보는 견해가 다수, 네로 때(68년경)로 보는 견해도 있다."
+  }
+}
