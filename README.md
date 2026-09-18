@@ -9,7 +9,7 @@
 - 데이터 & 라이선스: [docs/01-data-sources.md](docs/01-data-sources.md)
 - 진행 계획: [docs/02-plan.md](docs/02-plan.md)
 
-현재 상태: **설계 단계. Spike 00 (한글 지명 매핑) 착수 전.** 작업 규칙은 [AGENTS.md](AGENTS.md), 설계 정본은 노션.
+현재 상태: **Spike 00 통과 (한글 지명 매핑, 언급 가중 후보 98.9% · 정확도 추정 95.9%). Snow 수동 검증 대기.** 규칙 [AGENTS.md](AGENTS.md), 설계 정본은 노션.
 
 ## 이름에 대하여
 
