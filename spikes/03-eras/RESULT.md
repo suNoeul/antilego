@@ -885,3 +885,25 @@ era_regions.json   : Feature 68개
 - [ ] polity 별 `from`/`to` (722년 이후 북이스라엘)
 - [ ] 레반트 라벨 더미 — 확대 전에도 읽히게 할지, 덩이 수를 줄일지
 - [ ] 노션 `Decisions` 에 "레반트만 영역, 나머지는 이름만 · 레이어 기본 숨김" 한 줄 (노션 접근 있는 에이전트가)
+
+## 8. 배포
+
+`b39551a` 푸시 → Pages 워크플로 **success** (run 35327734903).
+`curl -s https://sunoeul.github.io/antilego/ | grep -o 'app.js?v=[0-9a-f]*'` → `app.js?v=b39551a`.
+새 데이터 세 파일 전부 **HTTP/2 200** (`data/eras.json` · `data/chapter_eras.json` ·
+`data/geo/era_regions.json`).
+
+배포본 `#1Kgs.12` 를 헤드리스 Chrome 1400×900 으로 열어 확인 (레이어 켠 채):
+
+| 확인 | 결과 |
+|---|---|
+| `window.__antilego.V` | `b39551a` |
+| 시대 | `divided_kingdom`, 캡션 `분열왕국 시대 · 기원전 930–586년경 — …` |
+| `path.region-blob` | **5** |
+| `text.region-label` | **2** (`북이스라엘`, `블레셋`) |
+| `circle.region-mark` | 0 (앗수르·바벨론·애굽은 이 장 화면 밖) |
+| `대략` 배지 · `시대` 버튼 | 보임 · `aria-pressed="true"` (새로고침 후 복원) |
+| `.place` | 17 |
+| `console.error` | **0건** |
+
+스크린샷 `shots/live-1kgs12.png`.
