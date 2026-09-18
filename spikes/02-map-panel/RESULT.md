@@ -396,3 +396,20 @@ Node 25.8.1 내장 WebSocket 으로 CDP 직접 호출. 1400×900 / 360×800(`mob
   "지명"이 남는다는 규칙이 아니다. `⟲` 로 돌아온다.
 - 1× 이동이 열리면서 **`⟲` 버튼의 쓸모가 커졌다** — 되돌릴 길이 그것뿐이다.
 - Spike 02 의 남은 결함(태블릿에서 본문을 덮음, 8× 상한, 핀치 미검증, 패널 아래 여백)은 그대로다.
+
+## 배포 (02-b)
+
+`a8ff1a6` 푸시 → Pages 워크플로 **success** (run 35325120171). `Stamp version` 단계 로그에
+`version = a8ff1a6`, `app.js?v=a8ff1a6`.
+
+| 확인 | 결과 |
+|---|---|
+| `curl -s https://sunoeul.github.io/antilego/ \| grep -o 'app.js?v=[0-9a-f]*'` | `app.js?v=a8ff1a6` (`styles.css?v=a8ff1a6` 도) |
+| `curl -sI .../app.js?v=a8ff1a6` · `styles.css` · `map.js` | 모두 **HTTP/2 200** |
+| 배포된 `app.js` 안 | `const V = 'a8ff1a6'`, `import './map.js?v=a8ff1a6'` |
+
+배포본 `#Josh.11/a2bb5ef` 를 헤드리스 Chrome 1400×900 으로 확인:
+`아라바` 라벨 `getBBox = [142.9, 196.9, 176.7, 211.6]` — 화면(320×240) 안쪽 8px 여백 충족,
+non-focus `circle` **12** == `text` **12**, focus 점 `r=4` 1개, 가장자리 fade 적용,
+1× 에서 150px 드래그 → `px = −130.1` (이동됨), `console.error` **0건**.
+스크린샷 `shots/b-live-josh11.png`.
