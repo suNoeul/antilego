@@ -1,6 +1,9 @@
 // 양식화 미니맵 렌더러. 순수 함수 — fetch·전역 상태 없음.
 // renderScene(svgEl, scene, layers, tokens, view)
-//   scene  = { focus: [placeId], others: [placeId], places: { id: {ko, lat, lon} } }
+//   scene  = { focus: [placeId], others: [placeId], places: { id: {ko, lat, lon} },
+//              regions: [GeoJSON Feature] }   ← Spike 03-d. 이 장의 시대 영역.
+//            regions 는 비어 있는 것이 정상이다(시대 불특정·원시사, 또는 레이어 꺼짐).
+//            properties.render 는 'blob'(폴리곤) 또는 'label_only'(이름만) 두 가지뿐.
 //   layers = { land, lakes, rivers, bbox }  GeoJSON FeatureCollection (없으면 생략).
 //            bbox 는 지형 데이터가 덮는 전체 범위 [lonMin, latMin, lonMax, latMax]
 //            (geo/meta.json). 이동 한계를 여기에 맞춘다.
@@ -27,6 +30,7 @@ const GAP = 3;                   // 점과 라벨 사이
 
 export const R_DOT = 2, R_FOCUS = 4;        // 점 반지름 (viewBox 단위 고정)
 export const SZ_DOT = 11, SZ_FOCUS = 13;    // 글자 크기 (viewBox 단위 고정)
+export const R_REGION = 3, SZ_REGION = 10;  // 시대 영역: 빈 동그라미 / 라벨
 
 // 지형 데이터가 덮는 범위 (geo/meta.json 의 bbox). layers.bbox 가 있으면 그쪽이 이긴다.
 export const GEO_BBOX = [8, 24, 50, 43];
@@ -34,6 +38,10 @@ export const GEO_BBOX = [8, 24, 50, 43];
 const DEFAULT_TOKENS = {
   sea: 'var(--sea)', land: 'var(--land)', coast: 'var(--coast)', river: 'var(--river)',
   dot: 'var(--dot)', dotDim: 'var(--dot-dim)', label: 'var(--label)',
+  labelDim: 'var(--label-dim)',
+  // 시대 영역: 2~3색 순환. 나라마다 다른 색을 주면 지도가 시끄러워진다.
+  regionFill: ['var(--region-a)', 'var(--region-b)', 'var(--region-c)'],
+  regionLine: ['var(--region-a-line)', 'var(--region-b-line)', 'var(--region-c-line)'],
 };
 
 export const BASE_VIEW = { z: 1, px: 0, py: 0 };
@@ -140,6 +148,25 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
     if (d) svgEl.append(el('path', { d, 'vector-effect': 'non-scaling-stroke', ...attrs }));
   };
   addGeo(L.land, { fill: t.land, stroke: t.coast, 'stroke-width': 0.8, 'stroke-linejoin': 'round' });
+
+  // --- 3. 시대 영역(blob). land 위 · lakes 아래. 점선 테두리 + 옅은 채움.
+  // 실선 금지 — 실선은 국경으로 읽힌다. 색은 2~3색 순환(나라마다 다른 색은 시끄럽다).
+  // 겹치는 것은 겹친 채로 둔다.
+  const regions = (scene.regions || []).filter(f => f && f.geometry && f.properties);
+  const blobs = regions.filter(f => f.properties.render === 'blob');
+  const marks = regions.filter(f => f.properties.render === 'label_only');
+  blobs.forEach((f, i) => {
+    const d = geoPath({ features: [f] }, P);
+    if (!d) return;
+    svgEl.append(el('path', {
+      d, class: 'region-blob',
+      fill: t.regionFill[i % t.regionFill.length], 'fill-rule': 'evenodd',
+      stroke: t.regionLine[i % t.regionLine.length], 'stroke-width': 1,
+      'stroke-dasharray': '2 2', 'stroke-linejoin': 'round',
+      'vector-effect': 'non-scaling-stroke',
+    }));
+  });
+
   addGeo(L.lakes, { fill: t.sea, stroke: t.coast, 'stroke-width': 0.6, 'stroke-linejoin': 'round' });
   addGeo(L.rivers, { fill: 'none', stroke: t.river, 'stroke-width': 1, 'stroke-linecap': 'round' });
 
@@ -151,6 +178,28 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   const drawn = [];
   let focusBox = null;
 
+  const boxOf = (anchor, tx, ty, bw, bh) => {
+    const left = anchor === 'middle' ? tx - bw / 2 : anchor === 'start' ? tx : tx - bw;
+    return [left, ty - bh, left + bw, ty];
+  };
+  // 후보 자리를 순서대로 훑어 화면 안이고 겹치지 않는 첫 자리를 고른다. 없으면 null.
+  const fit = (cands, bw, bh) => {
+    for (const [anchor, tx, ty] of cands) {
+      const b = boxOf(anchor, tx, ty, bw, bh);
+      if (!inside(b)) continue;
+      if (boxes.some(o => hit(o, b))) continue;
+      return { anchor, tx, ty, b };
+    }
+    return null;
+  };
+  // 점과 라벨의 네 자리: 아래 → 위 → 오른쪽 → 왼쪽
+  const around = (x, y, rad, size) => [
+    ['middle', x, y + rad + GAP + size],       // 아래
+    ['middle', x, y - rad - GAP],              // 위
+    ['start', x + rad + GAP, y + size * 0.36], // 오른쪽
+    ['end', x - rad - GAP, y + size * 0.36],   // 왼쪽
+  ];
+
   const put = (id, bold) => {
     const p = all[id];
     const [x, y] = P(p.lon, p.lat);
@@ -159,28 +208,20 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
     const rad = bold ? R_FOCUS : R_DOT;
     const text = p.ko || p.en || id;
     const bw = text.length * size * 0.92, bh = size * 1.25;
-    const box = (anchor, tx, ty) => {
-      const left = anchor === 'middle' ? tx - bw / 2 : anchor === 'start' ? tx : tx - bw;
-      return [left, ty - bh, left + bw, ty];
-    };
-    const cands = [
-      ['middle', x, y + rad + GAP + size],       // 아래
-      ['middle', x, y - rad - GAP],              // 위
-      ['start', x + rad + GAP, y + size * 0.36], // 오른쪽
-      ['end', x - rad - GAP, y + size * 0.36],   // 왼쪽
-    ];
-    let pick = null;
-    for (const [anchor, tx, ty] of cands) {
-      const b = box(anchor, tx, ty);
-      if (!inside(b)) continue;
-      if (!bold && boxes.some(o => hit(o, b))) continue;
-      pick = { anchor, tx, ty, b };
-      break;
-    }
+    const cands = around(x, y, rad, size);
+    let pick = bold
+      ? (() => {                                  // focus 는 겹쳐도 그린다
+        for (const [anchor, tx, ty] of cands) {
+          const b = boxOf(anchor, tx, ty, bw, bh);
+          if (inside(b)) return { anchor, tx, ty, b };
+        }
+        return null;
+      })()
+      : fit(cands, bw, bh);
     if (!pick) {
       if (!bold) return;                          // 이름 없는 점은 그리지 않는다
       const [anchor, tx, ty] = cands[0];
-      pick = { anchor, tx, ty, b: box(anchor, tx, ty) };
+      pick = { anchor, tx, ty, b: boxOf(anchor, tx, ty, bw, bh) };
     }
     boxes.push(pick.b);
     drawn.push({ x, y, rad, bold, size, text, ...pick });
@@ -193,6 +234,55 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   };
   focus.forEach(id => put(id, true));
   others.forEach(id => put(id, false));
+
+  // --- 6. 시대 영역의 이름. 지명 라벨이 **먼저** 자리를 잡은 뒤에 고르므로
+  // 우선순위가 낮다(겹치면 지명이 이긴다). 자리를 못 찾으면 그리지 않는다 —
+  // blob 은 이름 없이 색만 남고, label_only 는 아예 사라진다(이름 없는 표시는 없다).
+  const regionDrawn = [];
+  for (const f of regions) {
+    const pr = f.properties;
+    const mark = pr.render === 'label_only';
+    const at = mark
+      ? (f.geometry.type === 'Point' ? f.geometry.coordinates : null)
+      : pr.rep;
+    if (!at || at.length < 2) continue;
+    const [x, y] = P(at[0], at[1]);
+    if (!isFinite(x) || !isFinite(y)) continue;
+    const text = pr.polity_ko || '';
+    if (!text) continue;
+    // 상자를 조금 넉넉히 잡는다(+4). 지명 라벨과 딱 붙어 한 줄처럼 읽히는 것을 막는다.
+    const bw = text.length * SZ_REGION * 0.92 + 6, bh = SZ_REGION * 1.25 + 2;
+    const cands = mark
+      ? around(x, y, R_REGION, SZ_REGION)
+      : [['middle', x, y + SZ_REGION * 0.36],      // blob 은 대표점 위에 얹는다
+        ['middle', x, y + GAP + SZ_REGION],
+        ['middle', x, y - GAP],
+        ['start', x + GAP, y + SZ_REGION * 0.36],
+        ['end', x - GAP, y + SZ_REGION * 0.36]];
+    const pick = fit(cands, bw, bh);
+    if (!pick) continue;
+    boxes.push(pick.b);
+    regionDrawn.push({ x, y, rad: mark ? R_REGION : 0, text, ...pick });
+  }
+
+  // 빈 동그라미(label_only) → 영역 이름 → 지명 점 → 지명 라벨 순으로 쌓는다.
+  for (const d of regionDrawn) {
+    if (!d.rad) continue;
+    svgEl.append(el('circle', {
+      cx: r1(d.x), cy: r1(d.y), r: d.rad, class: 'region-mark',
+      fill: 'none', stroke: t.labelDim, 'stroke-width': 1,
+      'vector-effect': 'non-scaling-stroke',
+    }));
+  }
+  for (const d of regionDrawn) {
+    const n = el('text', {
+      x: r1(d.tx), y: r1(d.ty), fill: t.labelDim, 'text-anchor': d.anchor,
+      'font-size': SZ_REGION, 'font-weight': 400, class: 'region-label',
+      'font-family': 'system-ui, sans-serif',
+    });
+    n.textContent = d.text;
+    svgEl.append(n);
+  }
 
   // 점을 먼저 전부, 그 다음 라벨 — 라벨이 점 위로 온다.
   for (const d of drawn) {
@@ -214,7 +304,14 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   svgEl.setAttribute('aria-label', names ? `지도: ${names}` : '지도');
   // project 는 확대 버튼이 '지명이 모인 자리'를 기준으로 확대할 수 있게,
   // bounds·focusBox 는 app.js 가 이동 한계와 focus 시야를 맞출 수 있게 돌려준다.
-  return { view: v, labels: drawn.length, shown: shown.length, project: P, bounds, focusBox };
+  return {
+    view: v, labels: drawn.length, shown: shown.length, project: P, bounds, focusBox,
+    // 시대 영역: 데이터가 몇 개고 그중 몇 개가 실제로 그려졌는지(라벨 자리·화면 밖 때문에 준다)
+    regions: {
+      blobs: blobs.length, marks: marks.length,
+      labels: regionDrawn.length, drawnMarks: regionDrawn.filter(d => d.rad).length,
+    },
+  };
 }
 
 // GeoJSON → SVG path d. Polygon / MultiPolygon / LineString / MultiLineString만.

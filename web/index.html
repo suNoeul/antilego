@@ -42,14 +42,18 @@
   <div class="panel-in">
     <div class="map-wrap">
       <svg id="map" class="panel-map"></svg>
+      <span id="era-badge" class="era-badge" hidden>대략</span>
       <div class="zoom-ctl">
+        <button id="z-era" class="zbtn zbtn-txt" type="button" aria-pressed="false"
+                aria-label="시대 영역 표시">시대</button>
         <button id="z-in" class="zbtn" type="button" aria-label="확대">+</button>
         <button id="z-out" class="zbtn" type="button" aria-label="축소">−</button>
         <button id="z-reset" class="zbtn" type="button" aria-label="원래대로">⟲</button>
       </div>
     </div>
+    <p id="era-empty" class="era-empty" hidden>이 장은 시대를 특정하지 않아 영역을 표시하지 않습니다</p>
     <div id="place-block" class="place-block"></div>
-    <div id="era-caption" class="era-caption"></div>
+    <div id="era-caption" class="era-caption" hidden></div>
     <p id="panel-attr" class="panel-attr"></p>
   </div>
 </aside>

@@ -69,6 +69,46 @@ spikes/01-web-prototype/
 - `geo/meta.json`: `{ "bbox": [...], "source": "Natural Earth 1:10m v5.x", "simplify_tolerance": ... }`
 - 순수 파이썬으로 어려우면 `shapely`/`pyshp` 사용 가능 (venv). 다른 소스(OSM 등)는 **쓰지 않는다** (ODbL).
 
+### 시대 3종 (Spike 03-d) — `eras.json` · `chapter_eras.json` · `geo/era_regions.json`
+
+정본은 `data/derived/` 쪽이고 `web/data/` 는 파생물이다. 만드는 법:
+
+```
+python3 spikes/03-eras/export_web.py     # 의존성 없음. 멱등
+```
+
+`data/derived/{eras,chapter_eras,era_regions}.json` 에서 UI 가 쓰는 필드만 뽑아
+공백 없이 쓴다. 크기: **eras 11.4 KB · chapter_eras 3.2 KB · era_regions 27.5 KB**.
+`bust()` 가 붙는 일반 데이터 fetch 라 `?v=` 캐시 버스팅은 자동이다.
+
+```json
+// eras.json — 11개 항목(역사 9 + primeval + undated)
+{ "eras": [ { "id": "divided_kingdom", "ko": "분열왕국 시대",
+              "approx": "기원전 930–586년경",
+              "caption": "솔로몬 이후 나라가 …",
+              "note": "이 시대의 왕 연대는 틸레…",        // 연대 논쟁. 접어 둔다
+              "undated": true,                            // primeval·undated 에만 있다
+              "polities": [ { "ko": "북이스라엘", "render": "blob" }, … ] } ] }
+
+// chapter_eras.json — 66권. ranges 가 default 를 이긴다. 범위는 겹치지 않는다
+{ "1Kgs": { "default": "divided_kingdom", "ranges": [[1, 11, "united_kingdom"]] }, … }
+
+// geo/era_regions.json — Feature 68개 (blob 40 · label_only 28)
+{ "type": "FeatureCollection", "features": [
+  { "properties": { "era": "divided_kingdom", "polity_ko": "북이스라엘",
+                    "render": "blob", "rep": [35.572, 32.559] },   // rep = 라벨 자리
+    "geometry": { "type": "Polygon", … } },
+  { "properties": { "era": "divided_kingdom", "polity_ko": "앗수르 제국",
+                    "render": "label_only" },
+    "geometry": { "type": "Point", "coordinates": [43.15, 36.36] } } ] }
+```
+
+- `render` 는 **두 가지뿐**이다: `blob`(폴리곤) · `label_only`(이름만). 03-b 의 `wash` 는 없앴다.
+- `rep` 는 blob 의 대표점(가장 큰 폴리곤의 면적중심, 폴리곤 밖이면 그 높이 가로선의 가장 긴
+  내부 구간 중점). 브라우저가 매 렌더마다 계산하지 않게 내보낼 때 한 번 구한다.
+- `undated`/`primeval` 시대에는 Feature 가 **하나도 없다.** UI 는 그것을 정상으로 다룬다.
+- 상세와 판단 근거는 `spikes/03-eras/RESULT.md`.
+
 ### `attribution.json`
 표시용 문자열 배열. 최소:
 - "성경전서 개역한글판 © 대한성서공회"
@@ -114,7 +154,7 @@ Spike 01 의 "데스크톱 사이드 카드 + 모바일 인라인 카드 + 접�
   1. 지도 SVG — 패널 폭을 꽉 채우고 4:3 (최소 높이 240px)
   2. 확대·축소 버튼 `+` `−` `⟲` — 지도 오른쪽 아래 모서리에 작게
   3. 지명 블록 — 한글 18px 굵게 / 영문 12px 회색 / `이 장에서 N회 · 성경 전체 M회`
-  4. `#era-caption` — **빈 컨테이너**. Spike 03(시대 캡션)이 채운다. 비어 있으면 보이지 않는다
+  4. `#era-caption` — 시대 캡션 한 줄 (03-d, 아래)
   5. 출처 한 줄 (작게)
 - 선택 없음: 지도는 **이 장의 Scene**(이 장 지명 전부, 강조 없음), 지명 블록은
   "지명을 누르면 위치를 보여줍니다".
@@ -178,6 +218,41 @@ GitHub Pages 는 10분 캐시를 준다. 새 `index.html` 과 옛 `app.js` 가 �
   `sed -i "s/__V__/${GITHUB_SHA::7}/g" web/index.html web/app.js` 로 커밋 SHA 앞 7자리로 바꾼다.
 - 로컬에서는 `__V__` 그대로여도 동작한다(그냥 쿼리 문자열이다).
 - 확인: `curl -s https://sunoeul.github.io/antilego/ | grep -o 'app.js?v=[0-9a-f]*'`.
+
+### 시대 캡션 · 영역 레이어 (Spike 03-d)
+
+데이터는 위 "시대 3종". **모호하면 보여주지 않는다**(AGENTS.md)를 UI 에서 지키는 자리다.
+
+#### 캡션 `#era-caption` — 인라인 한 줄
+
+```
+분열왕국 시대 · 기원전 930–586년경 — 솔로몬 이후 나라가 … 눌러온다. (대략적인 구분)
+```
+
+- 지명 블록 **바로 아래**. 12px, `opacity: .7`, sans. 본문보다 확실히 약하게.
+- 조각: `.era-name`(굵게) `·` `.era-date` `—` `.era-text` `.era-approx`(11px).
+- **시대명을 누르면 `note`(연대 논쟁)가 한 줄 아래로 펼쳐진다.** 기본 접힘,
+  `aria-expanded`. `note` 가 없으면 시대명은 버튼이 아니라 그냥 글자다.
+- `undated: true`(원시사·시대 불특정)면 **캡션 전체를 숨긴다.** "시대 불특정"이라고
+  띄우지 않는다. 시대 데이터를 못 받았을 때도 마찬가지로 숨긴다(에러 문구 없음).
+
+#### 영역 레이어 — 기본 숨김, 토글로 켠다
+
+- 지도 조작 줄에 글자 버튼 `시대`(`#z-era`, `aria-pressed`). 기본 꺼짐,
+  `localStorage['eraLayer']` 에 기억한다.
+- 켜면 지도 **왼쪽 위**에 `대략` 배지(10px pill). 이 장의 시대에 그릴 영역이 하나도 없으면
+  지도 아래 한 줄: "이 장은 시대를 특정하지 않아 영역을 표시하지 않습니다"(12px, 옅게).
+- 그리는 순서: 바다 → land → **시대 영역(blob)** → lakes → rivers →
+  영역 표시(빈 동그라미) → 영역 이름 → 지명 점 → 지명 라벨.
+- `blob`: 채움 22–26%(`--region-a/b/c` 3색 순환) + 같은 색 진한 **점선** 테두리 1px
+  (`stroke-dasharray: 2 2`, `vector-effect: non-scaling-stroke`). **실선 금지** — 국경으로 읽힌다.
+  겹침은 겹친 채로 둔다. 라벨은 `rep` 좌표에 10px `--label-dim` weight 400.
+- `label_only`: **빈 동그라미 r=3**(1px) + 같은 10px 이름. 폴리곤 없음.
+- **라벨 우선순위는 지명이 위**다. 지명 라벨이 먼저 자리를 잡고, 영역 이름은 남은 자리에서
+  같은 탐욕 규칙으로 고른다. 자리가 없으면 그리지 않는다 — `label_only` 는 동그라미까지
+  사라진다(이름 없는 표시는 없다, 02-b 규칙 그대로). 확대하면 겹침이 풀려 되살아난다.
+- 크기는 배율과 무관하게 화면에서 고정(10px / r=3 / 1px). 영역은 지도와 함께 확대·이동한다.
+- 토큰: `--label-dim`, `--region-a/b/c`, `--region-a/b/c-line` (라이트·다크 양쪽).
 
 ### 라우팅 / 상태
 - URL 해시: `#Josh.10` (장), `#Josh.10/a231f80` (선택 지명 — `places.json` 키). 로드 시 해시 없으면 `#Gen.1`.

@@ -16,6 +16,9 @@ const DATA_BASE = q ? './' + q.replace(/[^\w.-]/g, '') + '/' : './data/';
 const TOKENS = {
   sea: 'var(--sea)', land: 'var(--land)', coast: 'var(--coast)', river: 'var(--river)',
   dot: 'var(--dot)', dotDim: 'var(--dot-dim)', label: 'var(--label)',
+  labelDim: 'var(--label-dim)',
+  regionFill: ['var(--region-a)', 'var(--region-b)', 'var(--region-c)'],
+  regionLine: ['var(--region-a-line)', 'var(--region-b-line)', 'var(--region-c-line)'],
 };
 
 const $ = id => document.getElementById(id);
@@ -29,7 +32,23 @@ const state = {
   book: null, ch: null, data: null, sel: null,   // book=null → 첫 apply()에서 무조건 로드
   open: false,                                   // 패널 열림 여부
   view: { ...BASE_VIEW },                        // 지도 확대·이동
+  // 시대 (Spike 03-d). 못 받으면 전부 null 인 채로 조용히 동작한다 — 캡션도 레이어도 없다.
+  eras: null, chapterEras: null, regionsByEra: null,
+  eraLayer: false,                               // 시대 영역 레이어. 기본 꺼짐
 };
+
+// --- 시대 (Spike 03-d) ---
+// 이 장의 시대. chapter_eras.json 의 ranges 가 default 를 이긴다.
+function eraOf(book, ch) {
+  const rec = state.chapterEras?.[book];
+  if (!rec) return null;
+  for (const [a, b, id] of rec.ranges || []) {
+    if (ch >= a && ch <= b) return state.eras?.[id] || null;
+  }
+  return state.eras?.[rec.default] || null;
+}
+// 이 시대의 영역. 시대를 특정하지 않는 장(원시사·시대 불특정)은 빈 배열이 정상이다.
+const regionsOf = era => (era && state.regionsByEra?.[era.id]) || [];
 
 const getJSON = async path => {
   const r = await fetch(bust(DATA_BASE + path));
@@ -64,6 +83,7 @@ function scene() {
     focus: pid && state.places[pid] ? [pid] : [],
     others: inCh.filter(p => p !== pid),
     places: state.places,
+    regions: state.eraLayer ? regionsOf(eraOf(state.book, state.ch)) : [],
   };
 }
 
@@ -113,6 +133,7 @@ function anchor() {
 function renderPanel() {
   drawMap();
   fitFocus();          // 선택된 지명이 잘리지 않게 시야를 맞춘다
+  renderEra();
   const box = $('place-block');
   box.textContent = '';
   const p = state.sel && state.places[state.sel];
@@ -130,6 +151,68 @@ function renderPanel() {
     hint.textContent = '지명을 누르면 위치를 보여줍니다';
     box.append(hint);
   }
+}
+
+// --- 시대 캡션 · 영역 레이어 UI (Spike 03-d) ---
+// 캡션은 인라인 한 줄이다: 시대명 · 연대 — 캡션 (대략적인 구분)
+// undated/primeval 이거나 데이터를 못 받았으면 **아무것도 띄우지 않는다**.
+// "시대 불특정"이라고 쓰는 것보다 안 쓰는 게 낫다 (AGENTS.md 원칙).
+function renderEra() {
+  const cap = $('era-caption');
+  const era = eraOf(state.book, state.ch);
+  const regions = regionsOf(era);
+
+  cap.textContent = '';
+  const show = !!era && !era.undated;
+  cap.hidden = !show;
+  if (show) {
+    const line = document.createElement('p');
+    line.className = 'era-line';
+    const name = document.createElement(era.note ? 'button' : 'span');
+    name.className = 'era-name';
+    name.textContent = era.ko;
+    if (era.note) {
+      name.type = 'button';
+      name.setAttribute('aria-expanded', 'false');
+      name.setAttribute('aria-controls', 'era-note');
+    }
+    line.append(name);
+    const add = (cls, text) => {
+      const n = document.createElement('span');
+      if (cls) n.className = cls;
+      n.textContent = text;
+      line.append(n);
+    };
+    if (era.approx) { add(null, ' · '); add('era-date', era.approx); }
+    if (era.caption) { add(null, ' — '); add('era-text', era.caption); }
+    add('era-approx', ' (대략적인 구분)');
+    cap.append(line);
+    if (era.note) {
+      const note = document.createElement('p');
+      note.className = 'era-note';
+      note.id = 'era-note';
+      note.hidden = true;                       // 기본 접힘
+      note.textContent = era.note;
+      cap.append(note);
+      name.addEventListener('click', () => {
+        note.hidden = !note.hidden;
+        name.setAttribute('aria-expanded', String(!note.hidden));
+      });
+    }
+  }
+
+  // 레이어를 켰을 때만: 지도 왼쪽 위 `대략` 배지, 그리고 그릴 영역이 없으면 한 줄 안내.
+  // 시대 데이터를 못 받았으면 둘 다 띄우지 않는다 — 이유가 다른 안내를 대신 띄우지 않는다.
+  const has = !!state.eras;
+  $('era-badge').hidden = !(state.eraLayer && has);
+  $('era-empty').hidden = !(state.eraLayer && has && era && regions.length === 0);
+}
+
+function setEraLayer(on, remember = true) {
+  state.eraLayer = !!on;
+  $('z-era').setAttribute('aria-pressed', String(state.eraLayer));
+  if (remember) ls.set('eraLayer', state.eraLayer ? '1' : '0');
+  if (state.open) { drawMap(); renderEra(); }
 }
 
 function setPanel(open, remember = true) {
@@ -386,6 +469,20 @@ async function boot() {
     const meta = await getJSON('geo/meta.json');
     if (Array.isArray(meta?.bbox) && meta.bbox.length === 4) state.layers.bbox = meta.bbox;
   } catch { /* 기본값 */ }
+  // 시대 (Spike 03-d). 못 받으면 캡션도 레이어도 없이 그대로 읽힌다 — 에러 문구는 띄우지 않는다.
+  try {
+    const [eras, chapterEras, regions] = await Promise.all([
+      getJSON('eras.json'), getJSON('chapter_eras.json'), getJSON('geo/era_regions.json'),
+    ]);
+    state.eras = Object.fromEntries((eras.eras || []).map(e => [e.id, e]));
+    state.chapterEras = chapterEras;
+    state.regionsByEra = {};
+    for (const f of regions.features || []) {
+      (state.regionsByEra[f.properties.era] ||= []).push(f);
+    }
+  } catch {
+    state.eras = null; state.chapterEras = null; state.regionsByEra = null;
+  }
   const attrLine = (state.attr || []).join(' · ');
   $('attr-line').textContent = attrLine;
   $('panel-attr').textContent = attrLine;
@@ -397,6 +494,7 @@ async function boot() {
   $('btn-next').addEventListener('click', () => step(1));
 
   $('btn-map').addEventListener('click', () => setPanel(!state.open));
+  $('z-era').addEventListener('click', () => setEraLayer(!state.eraLayer));
   $('scrim').addEventListener('click', () => setPanel(false));
   bindMapGestures();
   bindGrip();
@@ -420,10 +518,15 @@ async function boot() {
     const b = m && bookOf(m[1]);
     location.hash = b ? `#${m[1]}.${m[2]}` : '#Gen.1';
   }
+  // 시대 영역 레이어도 기억한다. 저장된 값이 없으면 꺼짐.
+  setEraLayer(ls.get('eraLayer') === '1', false);
   // 패널 열림 상태는 기억한다. 저장된 값이 없으면 닫힘.
   setPanel(ls.get('panel') === '1', false);
   // 검증(헤드리스 CDP)과 다음 스파이크를 위한 디버그 핸들. 앱 동작에는 관여하지 않는다.
-  window.__antilego = { state, drawMap, setPanel, anchor, fitFocus, renderPanel, V };
+  window.__antilego = {
+    state, drawMap, setPanel, anchor, fitFocus, renderPanel, V,
+    setEraLayer, renderEra, eraOf, regionsOf,
+  };
   await apply();
 }
 

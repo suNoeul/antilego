@@ -9,7 +9,8 @@
 - 데이터 & 라이선스: [docs/01-data-sources.md](docs/01-data-sources.md)
 - 진행 계획: [docs/02-plan.md](docs/02-plan.md)
 
-현재 상태: **Spike 01 배포됨 — 판정 대기 (Snow).** 규칙 [AGENTS.md](AGENTS.md), 설계 정본은 노션.
+현재 상태: **Spike 03 배포됨(2026-09-18) — 판정 대기 (Snow).** 시대 캡션 + 시대 영역 레이어(기본 숨김, `시대` 토글).
+규칙 [AGENTS.md](AGENTS.md), 설계 정본은 노션.
 
 **라이브 프로토타입:** https://sunoeul.github.io/antilego/#Josh.10
 저장소: https://github.com/suNoeul/antilego
