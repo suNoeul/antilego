@@ -12,6 +12,8 @@
   /* UI 토큰 */
   --bg: #fbf7ef;
   --card: #fffdf8;
+  --panel-bg: #fffdf8;
+  --panel-bg-0: rgba(255, 253, 248, 0);
   --ink: #23201c;
   --muted: #8b8276;
   --line: #e4dccd;
@@ -39,6 +41,8 @@
   --label: #e8e2d8;
   --bg: #171513;
   --card: #201d1a;
+  --panel-bg: #201d1a;
+  --panel-bg-0: rgba(32, 29, 26, 0);
   --ink: #e8e2d8;
   --muted: #948a7d;
   --line: #322d27;
@@ -246,10 +250,26 @@ body.panel-open .fab { right: var(--panel-w); }
 }
 .panel-map.grabbing { cursor: grabbing; }
 
+/* 가장자리 fade — 네 변이 패널 배경으로 스며든다. 지도가 액자에 갇힌 그림이 아니라
+   "더 있다"로 읽히게. 포인터는 통과시킨다(드래그가 살아 있어야 한다). */
+.map-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, var(--panel-bg), var(--panel-bg-0) 24px),
+    linear-gradient(to left, var(--panel-bg), var(--panel-bg-0) 24px),
+    linear-gradient(to bottom, var(--panel-bg), var(--panel-bg-0) 24px),
+    linear-gradient(to top, var(--panel-bg), var(--panel-bg-0) 24px);
+}
+
 .zoom-ctl {
   position: absolute;
   right: 6px;
   bottom: 6px;
+  z-index: 2;
   display: flex;
   gap: 4px;
 }

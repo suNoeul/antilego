@@ -25,6 +25,15 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure Pages
         uses: actions/configure-pages@v5
+      # 캐시 버스팅: 소스에는 리터럴 __V__ 가 남고, 배포본에서만 커밋 SHA 로 바뀐다.
+      # GitHub Pages 가 10분 캐시를 주기 때문에 이게 없으면 새 index.html + 옛 app.js
+      # 조합으로 흰 화면이 나온다.
+      - name: Stamp version (__V__ → commit SHA)
+        run: |
+          V="${GITHUB_SHA::7}"
+          sed -i "s/__V__/$V/g" web/index.html web/app.js
+          echo "version = $V"
+          grep -o 'app\.js?v=[0-9a-f]*' web/index.html
       - name: Upload artifact (web/ only)
         uses: actions/upload-pages-artifact@v3
         with:

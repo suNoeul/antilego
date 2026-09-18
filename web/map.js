@@ -1,13 +1,18 @@
 // 양식화 미니맵 렌더러. 순수 함수 — fetch·전역 상태 없음.
 // renderScene(svgEl, scene, layers, tokens, view)
 //   scene  = { focus: [placeId], others: [placeId], places: { id: {ko, lat, lon} } }
-//   layers = { land, lakes, rivers }  GeoJSON FeatureCollection (없으면 생략)
+//   layers = { land, lakes, rivers, bbox }  GeoJSON FeatureCollection (없으면 생략).
+//            bbox 는 지형 데이터가 덮는 전체 범위 [lonMin, latMin, lonMax, latMax]
+//            (geo/meta.json). 이동 한계를 여기에 맞춘다.
 //   tokens = { sea, land, coast, river, dot, dotDim, label }  색 문자열
 //            app.js는 'var(--sea)' 꼴을 넘긴다 → 다크 전환 시 재렌더 불필요.
 //   view   = { z, px, py }  확대·이동. z=1, px=py=0 이 scene bbox 그대로(기본값).
 //            좌표는 viewBox 픽셀 단위. 매 렌더마다 점·라벨을 다시 계산하므로
 //            점 크기와 글자 크기는 화면에서 항상 같고, 확대하면 겹침이 풀려
 //            숨어 있던 라벨이 되살아난다(LOD).
+//
+// 규칙 (Spike 02-b): **이름 없는 점은 그리지 않는다.** 라벨을 놓지 못한 non-focus
+// 지명은 점도 그리지 않는다. focus 는 언제나 그린다.
 
 export const W = 320, H = 240;   // viewBox. 카드 4:3
 export const ZOOM_MIN = 1, ZOOM_MAX = 8;
@@ -16,7 +21,15 @@ const MIN_DEG = 1.8;             // 최소 폭 200km ≈ 위도 1.8°
 const PAD = 0.25;                // 양쪽 25% 패딩
 const SVG = 'http://www.w3.org/2000/svg';
 const CLAMP = 20000;             // 화면 밖 좌표 잘라내기 (SVG가 clip)
-const MARGIN = 8;                // 이 만큼 밖으로 나간 점·라벨은 그리지 않는다
+const EDGE = 8;                  // 라벨은 이 여백 안쪽에 통째로 들어와야 한다
+const KEEP = 0.25;               // 아무리 밀어도 화면의 25%에는 데이터가 남는다
+const GAP = 3;                   // 점과 라벨 사이
+
+export const R_DOT = 2, R_FOCUS = 4;        // 점 반지름 (viewBox 단위 고정)
+export const SZ_DOT = 11, SZ_FOCUS = 13;    // 글자 크기 (viewBox 단위 고정)
+
+// 지형 데이터가 덮는 범위 (geo/meta.json 의 bbox). layers.bbox 가 있으면 그쪽이 이긴다.
+export const GEO_BBOX = [8, 24, 50, 43];
 
 const DEFAULT_TOKENS = {
   sea: 'var(--sea)', land: 'var(--land)', coast: 'var(--coast)', river: 'var(--river)',
@@ -25,20 +38,35 @@ const DEFAULT_TOKENS = {
 
 export const BASE_VIEW = { z: 1, px: 0, py: 0 };
 
-// 확대 배율과 이동량을 허용 범위로 자른다. z=1 이면 이동량은 0 으로 고정된다.
-export function clampView(v) {
+// 이동 한계. bounds 는 z=1·이동 0 일 때 데이터가 차지하는 viewBox 사각형
+// ({x0,y0,x1,y1}). 없으면 scene bbox(= 화면 전체)로 본다.
+const DEFAULT_BOUNDS = { x0: 0, y0: 0, x1: W, y1: H };
+
+// 한 축: 데이터가 화면의 KEEP 비율만큼은 남도록 이동량을 자른다.
+function clampAxis(p, z, b0, b1, size) {
+  const lo = size * KEEP - b1 * z;          // 데이터 오른쪽 끝이 화면 왼쪽 25% 안
+  const hi = size * (1 - KEEP) - b0 * z;    // 데이터 왼쪽 끝이 화면 오른쪽 25% 안
+  if (lo > hi) return (lo + hi) / 2;        // 데이터가 KEEP 보다 좁으면 가운데
+  return Math.max(lo, Math.min(hi, p));
+}
+
+// 확대 배율과 이동량을 허용 범위로 자른다.
+export function clampView(v, bounds) {
+  const b = bounds || DEFAULT_BOUNDS;
   const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (v && v.z) || 1));
-  const px = Math.max(W - W * z, Math.min(0, (v && v.px) || 0));
-  const py = Math.max(H - H * z, Math.min(0, (v && v.py) || 0));
-  return { z, px, py };
+  return {
+    z,
+    px: clampAxis((v && v.px) || 0, z, b.x0, b.x1, W),
+    py: clampAxis((v && v.py) || 0, z, b.y0, b.y1, H),
+  };
 }
 
 // (cx, cy) 를 제자리에 둔 채 factor 배 확대한다. viewBox 픽셀 좌표.
-export function zoomAt(v, cx, cy, factor) {
-  const cur = clampView(v);
+export function zoomAt(v, cx, cy, factor, bounds) {
+  const cur = clampView(v, bounds);
   const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, cur.z * factor));
   const k = z / cur.z;
-  return clampView({ z, px: cx - (cx - cur.px) * k, py: cy - (cy - cur.py) * k });
+  return clampView({ z, px: cx - (cx - cur.px) * k, py: cy - (cy - cur.py) * k }, bounds);
 }
 
 const el = (name, attrs) => {
@@ -47,6 +75,9 @@ const el = (name, attrs) => {
   return n;
 };
 const r1 = v => Math.round(Math.max(-CLAMP, Math.min(CLAMP, v)) * 10) / 10;
+const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+const inside = b =>
+  b[0] >= EDGE && b[2] <= W - EDGE && b[1] >= EDGE && b[3] <= H - EDGE;
 
 export function renderScene(svgEl, scene, layers, tokens, view) {
   const t = { ...DEFAULT_TOKENS, ...(tokens || {}) };
@@ -55,7 +86,6 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   const focus = (scene.focus || []).filter(id => all[id]);
   const others = (scene.others || []).filter(id => all[id] && !focus.includes(id));
   const shown = [...focus, ...others];
-  const v = clampView(view || BASE_VIEW);
 
   svgEl.textContent = '';
   svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -83,13 +113,23 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   if (h <= 0 || w / h > W / H) { const c = (y0 + y1) / 2; h = w * H / W; y0 = c - h / 2; y1 = c + h / 2; }
   else { const c = (x0 + x1) / 2; w = h * W / H; x0 = c - w / 2; x1 = c + w / 2; }
 
-  // scene bbox 스케일 × 확대 배율. 이동량은 viewBox 픽셀이라 그대로 더한다.
-  const s = (W / w) * v.z;
+  // --- 이동 한계: scene bbox 가 아니라 **지형 데이터 전체 범위** ---
+  // scene bbox 는 처음(⟲) 그림만 정하고, 이동은 지도가 있는 곳 어디로든 갈 수 있다.
+  const su = W / w;                                   // z=1 에서 도(度) → viewBox 픽셀
+  const gb = L.bbox && L.bbox.length === 4 ? L.bbox : GEO_BBOX;
+  const gMin = proj(gb[0], gb[3]);                    // lon 최소 · lat 최대 → x,y 최소
+  const gMax = proj(gb[2], gb[1]);
+  const bounds = {
+    x0: (gMin[0] - x0) * su, x1: (gMax[0] - x0) * su,
+    y0: (gMin[1] - y0) * su, y1: (gMax[1] - y0) * su,
+  };
+
+  const v = clampView(view || BASE_VIEW, bounds);
+  const s = su * v.z;
   const P = (lon, lat) => {
     const [x, y] = proj(lon, lat);
     return [(x - x0) * s + v.px, (y - y0) * s + v.py];
   };
-  const visible = (x, y) => x >= -MARGIN && x <= W + MARGIN && y >= -MARGIN && y <= H + MARGIN;
 
   // --- 1. 바다 ---
   svgEl.append(el('rect', { x: 0, y: 0, width: W, height: H, fill: t.sea }));
@@ -103,52 +143,79 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   addGeo(L.lakes, { fill: t.sea, stroke: t.coast, 'stroke-width': 0.6, 'stroke-linejoin': 'round' });
   addGeo(L.rivers, { fill: 'none', stroke: t.river, 'stroke-width': 1, 'stroke-linecap': 'round' });
 
-  // --- 5. 점. 반지름은 viewBox 단위 고정 → 확대해도 화면 크기 그대로 ---
-  for (const id of others) {
-    const [x, y] = P(all[id].lon, all[id].lat);
-    if (!visible(x, y)) continue;
-    svgEl.append(el('circle', { cx: r1(x), cy: r1(y), r: 3, fill: t.dotDim }));
-  }
-  for (const id of focus) {
-    const [x, y] = P(all[id].lon, all[id].lat);
-    if (!visible(x, y)) continue;
-    svgEl.append(el('circle', { cx: r1(x), cy: r1(y), r: 5, fill: t.dot }));
-  }
-
-  // --- 6. 라벨. focus를 먼저 놓고, 이미 놓인 라벨과 겹치는 non-focus는 숨긴다.
-  //     글자 크기도 viewBox 단위 고정이라 확대하면 점 사이가 벌어져 겹침이 풀린다. ---
+  // --- 5. 점 + 라벨을 함께 결정한다 ---
+  // 라벨 자리는 아래 → 위 → 오른쪽 → 왼쪽 순으로 찾는다. 네 자리 모두
+  // 화면(여백 EDGE) 밖으로 나가거나 이미 놓인 라벨과 겹치면 **점도 라벨도 그리지 않는다.**
+  // focus 는 예외 — 자리를 못 찾아도 아래쪽에 그대로 놓는다(app.js 가 시야를 맞춘다).
   const boxes = [];
-  let placed = 0;
-  const label = (id, size, bold) => {
+  const drawn = [];
+  let focusBox = null;
+
+  const put = (id, bold) => {
     const p = all[id];
     const [x, y] = P(p.lon, p.lat);
-    if (!visible(x, y)) return;
+    if (!isFinite(x) || !isFinite(y)) return;
+    const size = bold ? SZ_FOCUS : SZ_DOT;
+    const rad = bold ? R_FOCUS : R_DOT;
     const text = p.ko || p.en || id;
     const bw = text.length * size * 0.92, bh = size * 1.25;
-    const cx = bw + 4 < W ? Math.max(bw / 2 + 2, Math.min(W - bw / 2 - 2, x)) : x;
-    const cy = y + size + 5;
-    const box = [cx - bw / 2, cy - bh, cx + bw / 2, cy];
-    if (!bold && boxes.some(b => hit(b, box))) return;   // 충돌 → 숨김
-    boxes.push(box);
-    placed++;
+    const box = (anchor, tx, ty) => {
+      const left = anchor === 'middle' ? tx - bw / 2 : anchor === 'start' ? tx : tx - bw;
+      return [left, ty - bh, left + bw, ty];
+    };
+    const cands = [
+      ['middle', x, y + rad + GAP + size],       // 아래
+      ['middle', x, y - rad - GAP],              // 위
+      ['start', x + rad + GAP, y + size * 0.36], // 오른쪽
+      ['end', x - rad - GAP, y + size * 0.36],   // 왼쪽
+    ];
+    let pick = null;
+    for (const [anchor, tx, ty] of cands) {
+      const b = box(anchor, tx, ty);
+      if (!inside(b)) continue;
+      if (!bold && boxes.some(o => hit(o, b))) continue;
+      pick = { anchor, tx, ty, b };
+      break;
+    }
+    if (!pick) {
+      if (!bold) return;                          // 이름 없는 점은 그리지 않는다
+      const [anchor, tx, ty] = cands[0];
+      pick = { anchor, tx, ty, b: box(anchor, tx, ty) };
+    }
+    boxes.push(pick.b);
+    drawn.push({ x, y, rad, bold, size, text, ...pick });
+    if (bold && !focusBox) {
+      focusBox = [
+        Math.min(pick.b[0], x - rad), Math.min(pick.b[1], y - rad),
+        Math.max(pick.b[2], x + rad), Math.max(pick.b[3], y + rad),
+      ];
+    }
+  };
+  focus.forEach(id => put(id, true));
+  others.forEach(id => put(id, false));
+
+  // 점을 먼저 전부, 그 다음 라벨 — 라벨이 점 위로 온다.
+  for (const d of drawn) {
+    svgEl.append(el('circle', {
+      cx: r1(d.x), cy: r1(d.y), r: d.rad, fill: d.bold ? t.dot : t.dotDim,
+    }));
+  }
+  for (const d of drawn) {
     const n = el('text', {
-      x: r1(cx), y: r1(cy), fill: t.label, 'text-anchor': 'middle',
-      'font-size': size, 'font-weight': bold ? 700 : 400,
+      x: r1(d.tx), y: r1(d.ty), fill: t.label, 'text-anchor': d.anchor,
+      'font-size': d.size, 'font-weight': d.bold ? 700 : 400,
       'font-family': 'system-ui, sans-serif',
     });
-    n.textContent = text;
+    n.textContent = d.text;
     svgEl.append(n);
-  };
-  focus.forEach(id => label(id, 14, true));
-  others.forEach(id => label(id, 12, false));
+  }
 
   const names = shown.map(id => all[id].ko || id).join(', ');
   svgEl.setAttribute('aria-label', names ? `지도: ${names}` : '지도');
-  // project 는 확대 버튼이 '지명이 모인 자리'를 기준으로 확대할 수 있게 돌려준다.
-  return { view: v, labels: placed, shown: shown.length, project: P };
+  // project 는 확대 버튼이 '지명이 모인 자리'를 기준으로 확대할 수 있게,
+  // bounds·focusBox 는 app.js 가 이동 한계와 focus 시야를 맞출 수 있게 돌려준다.
+  return { view: v, labels: drawn.length, shown: shown.length, project: P, bounds, focusBox };
 }
-
-const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
 // GeoJSON → SVG path d. Polygon / MultiPolygon / LineString / MultiLineString만.
 function geoPath(fc, P) {

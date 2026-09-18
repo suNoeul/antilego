@@ -76,10 +76,11 @@ spikes/01-web-prototype/
 - "Proper names: STEPBible TIPNR (CC BY 4.0)"
 - "Basemap: Natural Earth (public domain)"
 
-## UI 스펙 (B) — Spike 02 개정 (2026-09-18)
+## UI 스펙 (B) — Spike 02 개정 (2026-09-18), 02-b 다듬기 (2026-09-18)
 
 Spike 01 의 "데스크톱 사이드 카드 + 모바일 인라인 카드 + 접힌 지도 + 크게 보기 모달"을 전부 버리고
 **지도 패널 하나**로 통일했다. 지명의 밑줄도 없앴다. 데이터 스키마(위)는 그대로다.
+02-b 에서 지도 세부(이름 없는 점·크기·이동 범위·가장자리·라벨 자리)와 캐시 버스팅을 손봤다.
 
 ### 레이아웃
 - 상단바(높이 48px, sticky): `권 ▾` `장 ▾` 셀렉트 두 개, `‹ ›` 장 이동, 오른쪽 끝 다크모드 토글 `☾`.
@@ -117,25 +118,43 @@ Spike 01 의 "데스크톱 사이드 카드 + 모바일 인라인 카드 + 접�
   5. 출처 한 줄 (작게)
 - 선택 없음: 지도는 **이 장의 Scene**(이 장 지명 전부, 강조 없음), 지명 블록은
   "지명을 누르면 위치를 보여줍니다".
-- 지명 선택 시: **그 지명 강조**(큰 점 r=5 + 14px 굵은 라벨), 같은 장의 다른 지명은 작은 점 r=3 + 12px 라벨.
+- 지명 선택 시: **그 지명 강조**(큰 점 r=4 + 13px 굵은 라벨), 같은 장의 다른 지명은 작은 점 r=2 + 11px 라벨.
+  (02-b 에서 5/14/3/12 → 4/13/2/11 로 줄였다. 화면에서의 크기는 배율과 무관하게 고정.)
 - 열림/닫힘 상태는 `localStorage` 에 저장한다(try/catch, 실패해도 동작). `Esc` 로 닫는다.
   장을 옮겨도 패널 상태는 유지되고, 새 장의 Scene 으로 다시 그린다.
 
 ### 지도 렌더러 (`map.js`) — 순수 함수 `renderScene(svgEl, scene, layers, tokens, view)`
 - `scene = { focus: [placeId], others: [placeId], places: {...} }`.
 - `view = { z, px, py }` — 확대 배율과 이동량(viewBox 픽셀). 기본 `{ z:1, px:0, py:0 }` = scene bbox 그대로.
-  `clampView` / `zoomAt` 를 같이 export 한다. 배율은 **1×–8×** 로 자르고, 이동은 내용이
-  화면 밖으로 완전히 빠지지 않게 자른다.
+  `clampView(view, bounds)` / `zoomAt(view, cx, cy, factor, bounds)` 를 같이 export 한다.
+  배율은 **1×–8×** 로 자른다.
+- **이동 범위 (02-b)**: scene bbox 는 **처음 그림(⟲ 복귀)만 정한다.** 이동은 어느 배율에서든
+  `geo/meta.json` 의 bbox(`[8, 24, 50, 43]`) 전체를 돌아다닐 수 있다 — **1× 에서도 끌 수 있다.**
+  다만 화면의 **25%** 에는 지형이 남도록 자른다(빈 공간으로 나가지 못한다).
+  `renderScene` 이 그 범위를 viewBox 픽셀로 계산해 `bounds` 로 돌려주고, `app.js` 가 그것을
+  `clampView`/`zoomAt` 에 넘긴다. `layers.bbox` 가 없으면 `map.js` 의 `GEO_BBOX` 기본값.
+- **focus 는 언제나 통째로 보인다 (02-b)**: 지명을 선택했을 때(그리고 ⟲ 로 되돌렸을 때)
+  focus 의 점 + 라벨이 여백 24px 안에 들어오도록 **배율은 그대로 두고 최소한으로 이동**한다
+  (`app.js` 의 `fitFocus`, 최대 3회 반복 — 라벨 자리가 바뀌면 다시 잰다).
 - 투영: 등장방형(equirectangular). x = (lon − lon0)·cos(lat0), y = −(lat − lat0). Scene bbox에 맞춰 viewBox 설정.
 - **bbox 규칙**: focus+others 좌표를 감싸고 25% 패딩, **최소 폭 200km**(≈ 위도 1.8°; 경도는 cos 보정), 비율 4:3으로 확장. 지명이 하나면 그 지명이 중심.
 - 그리는 순서: 바다(배경 rect) → land 폴리곤 → lakes → rivers(선) → 도시 점 → 라벨.
 - 스타일 토큰(CSS 변수, 라이트 기본값): `--sea #cfe3e6` `--land #f6f1e7` `--coast #a08461`(0.8px) `--river #7fa7c9`(1px) `--dot #8a5a2b` `--dot-dim #c7b8a3` `--label #2b2b2b`. 다크: `--sea #1d2a30` `--land #2a2622` `--coast #6b5a45` `--river #4c6f8f` `--dot #d9a066` `--dot-dim #5a5048` `--label #e8e2d8`.
-- 라벨: 한글, 12px(focus 14px bold). focus 를 먼저 놓고 **이미 놓인 라벨과 겹치는 non-focus 라벨은
+- 라벨: 한글, 11px(focus 13px bold). focus 를 먼저 놓고 **이미 놓인 라벨과 겹치는 non-focus 라벨은
   숨기는** 탐욕 규칙.
+- **이름 없는 점은 그리지 않는다 (02-b).** 라벨을 놓지 못한 non-focus 지명은 **점도 그리지 않는다.**
+  점과 이름은 언제나 함께 나타나고 함께 사라진다. 어느 배율에서든 non-focus `circle` 수 == `text` 수.
+  focus(선택된 지명)는 예외 — 언제나 그린다.
+- **라벨 자리 (02-b)**: 점의 아래 → 위 → 오른쪽 → 왼쪽 순으로 자리를 찾는다. 네 자리 모두
+  화면 안(여백 8px)에 통째로 들어가지 못하거나 이미 놓인 라벨과 겹치면 그 지명은 그리지 않는다.
+  **잘린 라벨은 없다.**
 - **확대 시 LOD**: 확대·이동은 `<g transform>` 이 아니라 **좌표를 다시 계산해서** 그린다.
   그래서 점 반지름(3/5)과 글자 크기(12/14)는 viewBox 단위로 고정 = 화면에서 항상 같은 크기이고,
   겹침 판정도 매 배율마다 화면 공간에서 다시 돈다 → **확대하면 1× 에서 숨었던 라벨이 되살아난다.**
   화면 밖(여유 8px)으로 나간 점과 라벨은 그리지 않는다.
+- **가장자리 fade (02-b)**: 지도 SVG 네 변에 24px 안쪽 그라디언트를 덮어(`.map-wrap::after`,
+  `--panel-bg` → `--panel-bg-0`, `pointer-events: none`) 액자가 아니라 "더 있다"로 읽히게 한다.
+  라이트·다크 토큰 양쪽에 `--panel-bg` / `--panel-bg-0`(같은 색의 alpha 0)을 둔다.
 - 색은 위 토큰만 사용. 실제 타일·이미지 없음. `geo/*`는 렌더 전에 한 번만 fetch해 캐시.
 - 폴리곤이 bbox 밖으로 나가도 그냥 그린다(SVG가 clip). 성능: 장별 Scene 렌더 < 50ms 목표. land 폴리곤은 path 하나로 합쳐도 됨.
 - 반환값 `{ view, labels, shown, project }` — `project(lon, lat)` 는 현재 view 기준 viewBox 좌표.
@@ -145,7 +164,20 @@ Spike 01 의 "데스크톱 사이드 카드 + 모바일 인라인 카드 + 접�
 - 드래그(포인터 1개): 이동. 더블클릭: 1.8배 확대.
 - `+` `−`: **지명이 모인 자리**(선택된 지명, 없으면 이 장 지명들의 무게중심)를 기준으로 1.6배씩.
   화면 한가운데를 기준으로 삼으면 확대할수록 지명이 화면 밖으로 밀려나기 때문이다.
-- `⟲`: scene bbox 로 되돌린다. 장이 바뀌거나 선택이 바뀌면 자동으로 되돌아간다.
+- `⟲`: scene bbox 로 되돌린다(그 다음 `fitFocus`). 장이 바뀌거나 선택이 바뀌면 자동으로 되돌아간다.
+
+### 캐시 버스팅 (02-b)
+
+GitHub Pages 는 10분 캐시를 준다. 새 `index.html` 과 옛 `app.js` 가 섞이면 흰 화면이 나온다
+(2026-09-18 실제로 겪었다). 그래서 **모든 자기 자원에 `?v=` 를 붙인다.**
+
+- 저장소의 소스에는 리터럴 `__V__` 가 그대로 남는다 — `styles.css?v=__V__`, `app.js?v=__V__`,
+  `app.js` 안의 `import './map.js?v=__V__'`, 그리고 `const V = '__V__'` 로 만든 `bust()` 가
+  **데이터 JSON 경로에도** 붙인다(`web/data` 만 다시 배포해도 옛 것이 안 나오게).
+- `.github/workflows/pages.yml` 이 업로드 **직전에** 체크아웃 사본에서만
+  `sed -i "s/__V__/${GITHUB_SHA::7}/g" web/index.html web/app.js` 로 커밋 SHA 앞 7자리로 바꾼다.
+- 로컬에서는 `__V__` 그대로여도 동작한다(그냥 쿼리 문자열이다).
+- 확인: `curl -s https://sunoeul.github.io/antilego/ | grep -o 'app.js?v=[0-9a-f]*'`.
 
 ### 라우팅 / 상태
 - URL 해시: `#Josh.10` (장), `#Josh.10/a231f80` (선택 지명 — `places.json` 키). 로드 시 해시 없으면 `#Gen.1`.

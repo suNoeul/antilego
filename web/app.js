@@ -1,6 +1,12 @@
 // Antilego 읽기 뷰. 본문이 주인공, 지도는 각주.
 // 지도는 패널 하나뿐이다. 기본 닫힘 → 플로팅 버튼이나 지명 클릭으로 연다.
-import { renderScene, clampView, zoomAt, BASE_VIEW, W, H } from './map.js';
+import { renderScene, clampView, zoomAt, BASE_VIEW, W, H } from './map.js?v=__V__';
+
+// 배포 버전. GitHub Pages 워크플로가 __V__ 를 커밋 SHA 앞 7자리로 바꾼다.
+// 로컬에서는 바뀌지 않은 채로도 그냥 동작한다 (그냥 쿼리 문자열이다).
+const V = '__V__';
+window.__V = V;
+const bust = path => path + (path.includes('?') ? '&' : '?') + 'v=' + V;
 
 // 데이터 경로. 기본 ./data/ , ?data=data-fixture 로 픽스처.
 const q = new URLSearchParams(location.search).get('data');
@@ -26,7 +32,7 @@ const state = {
 };
 
 const getJSON = async path => {
-  const r = await fetch(DATA_BASE + path);
+  const r = await fetch(bust(DATA_BASE + path));
   if (!r.ok) throw new Error(path + ' ' + r.status);
   return r.json();
 };
@@ -63,10 +69,31 @@ function scene() {
 
 // --- 지도 패널 ---
 function drawMap() {
-  state.view = clampView(state.view);
+  state.view = clampView(state.view, state.render?.bounds);
   state.render = renderScene($('map'), scene(), state.layers, TOKENS, state.view);
+  state.view = state.render.view;
   $('z-out').disabled = state.view.z <= 1.001;
   $('z-in').disabled = state.view.z >= 7.999;
+}
+
+// 선택된 지명은 점과 라벨이 통째로 화면 안(여백 FIT)에 들어와야 한다.
+// 배율은 건드리지 않고 **최소한으로 이동만** 한다. 라벨 자리가 바뀌면 다시 재어
+// 최대 세 번까지 맞춘다.
+const FIT = 24;
+function fitFocus() {
+  for (let i = 0; i < 3; i++) {
+    const b = state.render?.focusBox;
+    if (!b) return;
+    const dx = b[0] < FIT ? FIT - b[0] : (b[2] > W - FIT ? (W - FIT) - b[2] : 0);
+    const dy = b[1] < FIT ? FIT - b[1] : (b[3] > H - FIT ? (H - FIT) - b[3] : 0);
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+    const next = clampView(
+      { z: state.view.z, px: state.view.px + dx, py: state.view.py + dy },
+      state.render.bounds);
+    if (Math.abs(next.px - state.view.px) < 0.5 && Math.abs(next.py - state.view.py) < 0.5) return;
+    state.view = next;
+    drawMap();
+  }
 }
 
 // `+` `−` 버튼이 기준으로 삼는 점: 선택된 지명, 없으면 이 장 지명들의 무게중심.
@@ -85,6 +112,7 @@ function anchor() {
 
 function renderPanel() {
   drawMap();
+  fitFocus();          // 선택된 지명이 잘리지 않게 시야를 맞춘다
   const box = $('place-block');
   box.textContent = '';
   const p = state.sel && state.places[state.sel];
@@ -254,14 +282,14 @@ function bindMapGestures() {
   svg.addEventListener('wheel', e => {
     e.preventDefault();
     const [cx, cy] = toView(e.clientX, e.clientY);
-    state.view = zoomAt(state.view, cx, cy, Math.exp(-e.deltaY * 0.0022));
+    state.view = zoomAt(state.view, cx, cy, Math.exp(-e.deltaY * 0.0022), state.render?.bounds);
     drawMap();
   }, { passive: false });
 
   svg.addEventListener('dblclick', e => {
     e.preventDefault();
     const [cx, cy] = toView(e.clientX, e.clientY);
-    state.view = zoomAt(state.view, cx, cy, 1.8);
+    state.view = zoomAt(state.view, cx, cy, 1.8, state.render?.bounds);
     drawMap();
   });
 
@@ -286,7 +314,7 @@ function bindMapGestures() {
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pts.size === 2 && pinch) {
       const now = pinchState();
-      state.view = zoomAt(state.view, now.mid[0], now.mid[1], now.d / pinch.d);
+      state.view = zoomAt(state.view, now.mid[0], now.mid[1], now.d / pinch.d, state.render?.bounds);
       pinch = now;
       drawMap();
       return;
@@ -297,7 +325,7 @@ function bindMapGestures() {
         z: state.view.z,
         px: state.view.px + (e.clientX - last.x) / k,
         py: state.view.py + (e.clientY - last.y) / k,
-      });
+      }, state.render?.bounds);
       last = { x: e.clientX, y: e.clientY };
       drawMap();
     }
@@ -313,12 +341,12 @@ function bindMapGestures() {
 
   const zoomBtn = f => () => {
     const [ax, ay] = anchor();
-    state.view = zoomAt(state.view, ax, ay, f);
+    state.view = zoomAt(state.view, ax, ay, f, state.render?.bounds);
     drawMap();
   };
   $('z-in').addEventListener('click', zoomBtn(1.6));
   $('z-out').addEventListener('click', zoomBtn(1 / 1.6));
-  $('z-reset').addEventListener('click', () => { resetView(); drawMap(); });
+  $('z-reset').addEventListener('click', () => { resetView(); drawMap(); fitFocus(); });
 }
 
 // 모바일 시트: 손잡이를 아래로 끌면 닫힌다
@@ -353,6 +381,11 @@ async function boot() {
   for (const k of ['land', 'lakes', 'rivers']) {
     try { state.layers[k] = await getJSON(`geo/${k}.json`); } catch { state.layers[k] = null; }
   }
+  // 지형이 덮는 범위 = 이동 한계. 못 받으면 map.js 의 기본값(GEO_BBOX)을 쓴다.
+  try {
+    const meta = await getJSON('geo/meta.json');
+    if (Array.isArray(meta?.bbox) && meta.bbox.length === 4) state.layers.bbox = meta.bbox;
+  } catch { /* 기본값 */ }
   const attrLine = (state.attr || []).join(' · ');
   $('attr-line').textContent = attrLine;
   $('panel-attr').textContent = attrLine;
@@ -390,7 +423,7 @@ async function boot() {
   // 패널 열림 상태는 기억한다. 저장된 값이 없으면 닫힘.
   setPanel(ls.get('panel') === '1', false);
   // 검증(헤드리스 CDP)과 다음 스파이크를 위한 디버그 핸들. 앱 동작에는 관여하지 않는다.
-  window.__antilego = { state, drawMap, setPanel, anchor };
+  window.__antilego = { state, drawMap, setPanel, anchor, fitFocus, renderPanel, V };
   await apply();
 }
 
