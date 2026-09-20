@@ -33,8 +33,9 @@
   --scrim: rgba(30, 24, 16, .28);
   --serif: "Noto Serif KR", "Apple SD Gothic Neo", serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  /* 지도 패널 */
+  /* 지도 패널. --panel-w-user 는 ≥1200px 에서만 쓰인다 (02-c, app.js 가 바꾼다) */
   --panel-w: 400px;
+  --panel-w-user: 400px;
   --sheet-h: 55vh;
   --topbar-h: 48px;
 }
@@ -258,8 +259,7 @@ body.panel-open .fab { right: var(--panel-w); }
 .panel-map {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  min-height: 240px;
+  aspect-ratio: 4 / 3;      /* app.js 가 인라인 width/height 로 픽셀 크기를 정하기 전까지만 */
   touch-action: none;
   cursor: grab;
 }
@@ -396,9 +396,47 @@ body.panel-open .fab { right: var(--panel-w); }
   padding-top: 8px;
 }
 
+/* --- 패널 왼쪽 가장자리 손잡이 (02-c) --- */
+/* 6px 짜리 집는 자리 + 그 안에 가는 1px 선. 평소엔 --line, 잡으면 --accent.
+   z-index 는 패널(40) 위 · 플로팅 버튼(45) 아래 — `닫기` 가 계속 눌린다. */
+.resizer {
+  display: none;
+  position: fixed;
+  z-index: 44;
+  top: var(--topbar-h);
+  bottom: 0;
+  right: calc(var(--panel-w) - 3px);
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 1px;
+  background: var(--line);
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.resizer:hover::before, .resizer.on::before, .resizer:focus-visible::before {
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--hl);
+}
+.resizer:focus-visible { outline: none; }
+
+/* 끄는 동안은 글자가 잡히지 않게. 플로팅 버튼도 지연 없이 따라붙는다. */
+body.resizing { user-select: none; -webkit-user-select: none; cursor: col-resize; }
+body.resizing .fab { transition: none; }
+body.resizing .panel-map { cursor: col-resize; }
+
 /* --- 데스크톱 ≥1200px: 본문을 밀어낸다 --- */
 @media (min-width: 1200px) {
+  /* 여기서만 사용자가 정한 폭을 쓴다. 덮기(900–1199)·모바일 시트는 400px 그대로. */
+  :root { --panel-w: var(--panel-w-user); }
   body.panel-open { margin-right: var(--panel-w); }
+  body.panel-open .resizer { display: block; }
 }
 
 /* --- 태블릿 900–1199px: 덮되 가림막 --- */

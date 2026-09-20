@@ -9,8 +9,8 @@
 지명을 탭하면 읽던 자리에서 양식화된 미니맵이 펼쳐진다.
 
 궤적: 데이터 → 프로토타입(한 장) → UI 없는 코어 라이브러리+CLI → 웹 → 에이전트 플러그인(MCP) → 모바일 앱.
-현재 단계: **Spike 03 배포됨(2026-09-18) — 시대 캡션·영역 레이어. 피드백 대기.**
-라이브: https://sunoeul.github.io/antilego/  결과: `spikes/03-eras/RESULT.md` (앞 단계: `spikes/02-map-panel/RESULT.md`, `spikes/01-web-prototype/RESULT.md`)
+현재 단계: **02-c 패널 리사이즈 배포(2026-09-21) — 큰 화면에서 패널 가장자리를 끌어 지도를 넓힌다. 피드백 대기.**
+라이브: https://sunoeul.github.io/antilego/  결과: `spikes/02-map-panel/RESULT.md` (02 · 02-b · 02-c), `spikes/03-eras/RESULT.md`, `spikes/01-web-prototype/RESULT.md`
 
 ## 두 공간
 
@@ -45,7 +45,7 @@
 
 | 누가 | 어디 | 무엇 | 시작 |
 |---|---|---|---|
-| — | — | — | — |
+| Fable | `web/` `spikes/02-map-panel/` | 02-c 패널 리사이즈 | 2026-09-21 |
 
 ## 디렉토리
 

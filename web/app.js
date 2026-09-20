@@ -1,6 +1,7 @@
 // Antilego 읽기 뷰. 본문이 주인공, 지도는 각주.
 // 지도는 패널 하나뿐이다. 기본 닫힘 → 플로팅 버튼이나 지명 클릭으로 연다.
-import { renderScene, clampView, zoomAt, BASE_VIEW, W, H } from './map.js?v=__V__';
+import { renderScene, clampView, zoomAt, sceneFrame, BASE_VIEW, DEF_W, DEF_H }
+  from './map.js?v=__V__';
 
 // 배포 버전. GitHub Pages 워크플로가 __V__ 를 커밋 SHA 앞 7자리로 바꾼다.
 // 로컬에서는 바뀌지 않은 채로도 그냥 동작한다 (그냥 쿼리 문자열이다).
@@ -22,6 +23,9 @@ const TOKENS = {
 };
 
 const $ = id => document.getElementById(id);
+// 지금 그려진 지도의 픽셀 크기. 02-c 이후 320×240 상수가 아니라 패널에서 잰 값이다.
+const vw = () => state.render?.W || DEF_W;
+const vh = () => state.render?.H || DEF_H;
 const ls = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* 무시 */ } },
@@ -31,6 +35,7 @@ const state = {
   index: null, places: {}, layers: {}, attr: [],
   book: null, ch: null, data: null, sel: null,   // book=null → 첫 apply()에서 무조건 로드
   open: false,                                   // 패널 열림 여부
+  panelW: 400,                                   // 패널 폭(02-c). ≥1200px 에서만 바뀐다
   view: { ...BASE_VIEW },                        // 지도 확대·이동
   // 시대 (Spike 03-d). 못 받으면 전부 null 인 채로 조용히 동작한다 — 캡션도 레이어도 없다.
   eras: null, chapterEras: null, regionsByEra: null,
@@ -87,13 +92,81 @@ function scene() {
   };
 }
 
+// --- 패널 폭 (02-c) ---
+// 밀어내기 모드(≥1200px)에서만 패널 왼쪽 가장자리를 끌어 넓힌다. 덮기(900–1199)와
+// 모바일 시트는 손대지 않는다 — CSS 가 ≥1200 에서만 `--panel-w-user` 를 쓴다.
+// 본문 컬럼은 어떤 경우에도 640px 아래로 내려가지 않는다.
+const PANEL_MIN = 400;                 // 기본이자 최소
+const TEXT_MIN = 640;                  // 본문 컬럼 최소 폭
+const GUTTER = 24, BREATH = 48;        // 양쪽 여백 + 숨 쉴 자리
+const pushMode = () => window.innerWidth >= 1200;
+const panelMax = () =>
+  Math.max(PANEL_MIN, Math.round(window.innerWidth - TEXT_MIN - 2 * GUTTER - BREATH));
+const clampPanelW = w =>
+  Math.round(Math.max(PANEL_MIN, Math.min(panelMax(), Number(w) || PANEL_MIN)));
+const storedW = () => { const n = Number(ls.get('panelW')); return n > 0 ? n : PANEL_MIN; };
+
+function setPanelW(w) {
+  state.panelW = clampPanelW(w);
+  document.documentElement.style.setProperty('--panel-w-user', state.panelW + 'px');
+  const r = $('resizer');
+  r.setAttribute('aria-valuenow', String(state.panelW));
+  r.setAttribute('aria-valuemin', String(PANEL_MIN));
+  r.setAttribute('aria-valuemax', String(panelMax()));
+}
+const saveW = () => ls.set('panelW', String(state.panelW));
+
 // --- 지도 패널 ---
+// 지도 픽셀 크기: 폭 = 패널 안쪽 폭, 높이 = min(폭 × 0.75, 창 높이 × 0.7).
+// SVG 를 이 크기 그대로 그린다 → viewBox 와 CSS 상자가 1:1, 글자가 늘어나지 않는다.
+function mapSize() {
+  const svg = $('map');
+  svg.style.width = '';                       // 먼저 풀어야 패널 폭을 다시 잰다
+  svg.style.height = '';
+  const w = Math.max(160, Math.round(svg.clientWidth) || DEF_W);
+  const h = Math.max(120, Math.round(Math.min(w * 0.75, window.innerHeight * 0.7)));
+  svg.style.width = w + 'px';
+  svg.style.height = h + 'px';
+  return [w, h];
+}
+
 function drawMap() {
+  mapSize();
   state.view = clampView(state.view, state.render?.bounds);
   state.render = renderScene($('map'), scene(), state.layers, TOKENS, state.view);
   state.view = state.render.view;
   $('z-out').disabled = state.view.z <= 1.001;
   $('z-in').disabled = state.view.z >= 7.999;
+}
+
+// 크기가 바뀌어도 보던 자리와 배율은 그대로. 새 크기에서 화면 한가운데가 같은 지점을
+// 가리키도록 px·py 만 옮긴다(배율 z 는 건드리지 않는다). 그래서 장면이 튀지 않는다.
+function keepCenter(nextW, nextH) {
+  const r = state.render;
+  if (!r || !r.su) return;
+  const s = r.su * state.view.z;
+  const sx = (r.W / 2 - state.view.px) / s + r.x0;      // 화면 한가운데의 장면 좌표
+  const sy = (r.H / 2 - state.view.py) / s + r.y0;
+  const f = sceneFrame(scene(), nextW, nextH);
+  const s2 = f.su * state.view.z;
+  state.view = {
+    z: state.view.z,
+    px: nextW / 2 - (sx - f.x0) * s2,
+    py: nextH / 2 - (sy - f.y0) * s2,
+  };
+}
+
+// 리사이즈는 애니메이션 프레임으로 묶는다 — 드래그 한 번에 렌더 한 번.
+let relayoutRaf = 0;
+function relayout() {
+  if (!state.open) return;
+  const [w, h] = mapSize();
+  if (state.render && (state.render.W !== w || state.render.H !== h)) keepCenter(w, h);
+  drawMap();
+}
+function scheduleRelayout() {
+  if (relayoutRaf) return;
+  relayoutRaf = requestAnimationFrame(() => { relayoutRaf = 0; relayout(); });
 }
 
 // 선택된 지명은 점과 라벨이 통째로 화면 안(여백 FIT)에 들어와야 한다.
@@ -104,6 +177,7 @@ function fitFocus() {
   for (let i = 0; i < 3; i++) {
     const b = state.render?.focusBox;
     if (!b) return;
+    const W = vw(), H = vh();
     const dx = b[0] < FIT ? FIT - b[0] : (b[2] > W - FIT ? (W - FIT) - b[2] : 0);
     const dy = b[1] < FIT ? FIT - b[1] : (b[3] > H - FIT ? (H - FIT) - b[3] : 0);
     if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
@@ -123,11 +197,11 @@ function anchor() {
   const ids = state.sel && state.places[state.sel]
     ? [state.sel]
     : (state.data?.places || []).map(x => x.p).filter(p => state.places[p]);
-  if (!proj || !ids.length) return [W / 2, H / 2];
+  if (!proj || !ids.length) return [vw() / 2, vh() / 2];
   const lon = ids.reduce((a, p) => a + state.places[p].lon, 0) / ids.length;
   const lat = ids.reduce((a, p) => a + state.places[p].lat, 0) / ids.length;
   const [x, y] = proj(lon, lat);
-  return [Math.max(0, Math.min(W, x)), Math.max(0, Math.min(H, y))];
+  return [Math.max(0, Math.min(vw(), x)), Math.max(0, Math.min(vh(), y))];
 }
 
 function renderPanel() {
@@ -354,12 +428,12 @@ function bindMapGestures() {
   const svg = $('map');
   const toView = (clientX, clientY) => {
     const r = svg.getBoundingClientRect();
-    if (!r.width || !r.height) return [W / 2, H / 2];
-    return [(clientX - r.left) / r.width * W, (clientY - r.top) / r.height * H];
+    if (!r.width || !r.height) return [vw() / 2, vh() / 2];
+    return [(clientX - r.left) / r.width * vw(), (clientY - r.top) / r.height * vh()];
   };
   const pxPerUnit = () => {
     const r = svg.getBoundingClientRect();
-    return r.width ? r.width / W : 1;
+    return r.width ? r.width / vw() : 1;
   };
 
   svg.addEventListener('wheel', e => {
@@ -432,6 +506,46 @@ function bindMapGestures() {
   $('z-reset').addEventListener('click', () => { resetView(); drawMap(); fitFocus(); });
 }
 
+// 패널 왼쪽 가장자리를 끌어 폭을 바꾼다 (02-c). 마우스·터치·펜 모두 Pointer Events 하나로.
+// 더블클릭하면 400px 로 돌아온다. `⟲` 는 폭을 건드리지 않는다 — 그건 시야만 되돌린다.
+function bindResizer() {
+  const r = $('resizer');
+  let id = null, x0 = 0, w0 = 0;
+  r.addEventListener('pointerdown', e => {
+    if (!pushMode() || e.button > 0) return;
+    id = e.pointerId; x0 = e.clientX; w0 = state.panelW;
+    r.setPointerCapture?.(id);
+    document.body.classList.add('resizing');
+    r.classList.add('on');
+    e.preventDefault();
+  });
+  r.addEventListener('pointermove', e => {
+    if (id === null || e.pointerId !== id) return;
+    setPanelW(w0 - (e.clientX - x0));        // 왼쪽으로 끌면 넓어진다
+    scheduleRelayout();
+  });
+  const end = e => {
+    if (id === null || (e && e.pointerId !== id)) return;
+    id = null;
+    document.body.classList.remove('resizing');
+    r.classList.remove('on');
+    saveW();
+    scheduleRelayout();
+  };
+  r.addEventListener('pointerup', end);
+  r.addEventListener('pointercancel', end);
+  r.addEventListener('dblclick', () => { setPanelW(PANEL_MIN); saveW(); scheduleRelayout(); });
+  r.addEventListener('keydown', e => {
+    const d = e.key === 'ArrowLeft' ? 24 : e.key === 'ArrowRight' ? -24
+      : e.key === 'Home' ? -1e6 : 0;
+    if (!d) return;
+    e.preventDefault();
+    setPanelW(state.panelW + d);
+    saveW();
+    scheduleRelayout();
+  });
+}
+
 // 모바일 시트: 손잡이를 아래로 끌면 닫힌다
 function bindGrip() {
   const grip = $('grip');
@@ -497,6 +611,7 @@ async function boot() {
   $('z-era').addEventListener('click', () => setEraLayer(!state.eraLayer));
   $('scrim').addEventListener('click', () => setPanel(false));
   bindMapGestures();
+  bindResizer();
   bindGrip();
 
   document.addEventListener('click', e => {
@@ -510,7 +625,9 @@ async function boot() {
     if (e.key === 'Escape' && state.open) setPanel(false);
   });
   window.addEventListener('hashchange', apply);
-  window.addEventListener('resize', () => { if (state.open) drawMap(); });
+  // 창이 좁아지면 패널도 따라 줄어든다(본문 640px 을 지키느라). 저장된 폭은 그대로 둔다 —
+  // 다시 넓어지면 원래 폭으로 돌아온다.
+  window.addEventListener('resize', () => { setPanelW(storedW()); scheduleRelayout(); });
 
   if (!location.hash) {
     const last = ls.get('last');
@@ -518,6 +635,8 @@ async function boot() {
     const b = m && bookOf(m[1]);
     location.hash = b ? `#${m[1]}.${m[2]}` : '#Gen.1';
   }
+  // 패널 폭도 기억한다. 저장된 값이 없으면 400px.
+  setPanelW(storedW());
   // 시대 영역 레이어도 기억한다. 저장된 값이 없으면 꺼짐.
   setEraLayer(ls.get('eraLayer') === '1', false);
   // 패널 열림 상태는 기억한다. 저장된 값이 없으면 닫힘.
@@ -526,6 +645,7 @@ async function boot() {
   window.__antilego = {
     state, drawMap, setPanel, anchor, fitFocus, renderPanel, V,
     setEraLayer, renderEra, eraOf, regionsOf,
+    setPanelW, saveW, panelMax, relayout, mapSize, scene,
   };
   await apply();
 }

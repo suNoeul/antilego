@@ -17,7 +17,11 @@
 // 규칙 (Spike 02-b): **이름 없는 점은 그리지 않는다.** 라벨을 놓지 못한 non-focus
 // 지명은 점도 그리지 않는다. focus 는 언제나 그린다.
 
-export const W = 320, H = 240;   // viewBox. 카드 4:3
+// viewBox 크기는 상수가 아니라 **SVG 에서 잰 픽셀 값**이다 (02-c).
+// SVG 를 픽셀 크기로 그린다(viewBox = 0 0 w h, width/height 속성 = w/h) → 글자도 점도
+// CSS 로 늘어나지 않는다. 그래서 패널을 넓히면 지도가 '확대'되는 게 아니라
+// **더 넓게 보이고 라벨이 더 많이 살아난다**(겹침 판정이 넓어진 화면에서 다시 돌기 때문).
+export const DEF_W = 320, DEF_H = 240;   // 크기를 못 재면 쓰는 기본값 (4:3)
 export const ZOOM_MIN = 1, ZOOM_MAX = 8;
 
 const MIN_DEG = 1.8;             // 최소 폭 200km ≈ 위도 1.8°
@@ -47,8 +51,9 @@ const DEFAULT_TOKENS = {
 export const BASE_VIEW = { z: 1, px: 0, py: 0 };
 
 // 이동 한계. bounds 는 z=1·이동 0 일 때 데이터가 차지하는 viewBox 사각형
-// ({x0,y0,x1,y1}). 없으면 scene bbox(= 화면 전체)로 본다.
-const DEFAULT_BOUNDS = { x0: 0, y0: 0, x1: W, y1: H };
+// ({x0,y0,x1,y1}) + **그때의 화면 크기 W·H**. 화면 크기를 같이 들고 다녀야
+// clampView 가 바깥에서 호출돼도 지금 패널 크기로 자를 수 있다.
+const DEFAULT_BOUNDS = { x0: 0, y0: 0, x1: DEF_W, y1: DEF_H, W: DEF_W, H: DEF_H };
 
 // 한 축: 데이터가 화면의 KEEP 비율만큼은 남도록 이동량을 자른다.
 function clampAxis(p, z, b0, b1, size) {
@@ -64,8 +69,8 @@ export function clampView(v, bounds) {
   const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (v && v.z) || 1));
   return {
     z,
-    px: clampAxis((v && v.px) || 0, z, b.x0, b.x1, W),
-    py: clampAxis((v && v.py) || 0, z, b.y0, b.y1, H),
+    px: clampAxis((v && v.px) || 0, z, b.x0, b.x1, b.W || DEF_W),
+    py: clampAxis((v && v.py) || 0, z, b.y0, b.y1, b.H || DEF_H),
   };
 }
 
@@ -84,21 +89,15 @@ const el = (name, attrs) => {
 };
 const r1 = v => Math.round(Math.max(-CLAMP, Math.min(CLAMP, v)) * 10) / 10;
 const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-const inside = b =>
-  b[0] >= EDGE && b[2] <= W - EDGE && b[1] >= EDGE && b[3] <= H - EDGE;
 
-export function renderScene(svgEl, scene, layers, tokens, view) {
-  const t = { ...DEFAULT_TOKENS, ...(tokens || {}) };
-  const L = layers || {};
-  const all = scene.places || {};
-  const focus = (scene.focus || []).filter(id => all[id]);
-  const others = (scene.others || []).filter(id => all[id] && !focus.includes(id));
+// 장면의 틀 — 어떤 지명을 그릴지, 그리고 z=1 에서 도(度) → 픽셀 축척(su)과 원점(x0,y0).
+// W·H 가 바뀌면 su 와 x0·y0 가 같이 바뀐다. 순수 함수이고 DOM 을 만지지 않으므로
+// app.js 가 리사이즈 직전에 "새 크기의 틀"을 미리 구해 화면 중심을 붙들어 두는 데 쓴다.
+export function sceneFrame(scene, W, H) {
+  const all = (scene && scene.places) || {};
+  const focus = ((scene && scene.focus) || []).filter(id => all[id]);
+  const others = ((scene && scene.others) || []).filter(id => all[id] && !focus.includes(id));
   const shown = [...focus, ...others];
-
-  svgEl.textContent = '';
-  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  svgEl.setAttribute('role', 'img');
 
   // --- 투영: 등장방형. x = (lon−lon0)·cos(lat0), y = −(lat−lat0) ---
   const lats = shown.map(id => all[id].lat), lons = shown.map(id => all[id].lon);
@@ -107,7 +106,7 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   const k = Math.cos(lat0 * Math.PI / 180);
   const proj = (lon, lat) => [(lon - lon0) * k, -(lat - lat0)];
 
-  // --- bbox: 25% 패딩 → 최소 폭 → 4:3 ---
+  // --- bbox: 25% 패딩 → 최소 폭 → 화면 비율(W:H) ---
   const pts = shown.map(id => proj(all[id].lon, all[id].lat));
   let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
   if (pts.length) {
@@ -121,17 +120,45 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   if (h <= 0 || w / h > W / H) { const c = (y0 + y1) / 2; h = w * H / W; y0 = c - h / 2; y1 = c + h / 2; }
   else { const c = (x0 + x1) / 2; w = h * W / H; x0 = c - w / 2; x1 = c + w / 2; }
 
-  // --- 이동 한계: scene bbox 가 아니라 **지형 데이터 전체 범위** ---
-  // scene bbox 는 처음(⟲) 그림만 정하고, 이동은 지도가 있는 곳 어디로든 갈 수 있다.
-  const su = W / w;                                   // z=1 에서 도(度) → viewBox 픽셀
-  const gb = L.bbox && L.bbox.length === 4 ? L.bbox : GEO_BBOX;
-  const gMin = proj(gb[0], gb[3]);                    // lon 최소 · lat 최대 → x,y 최소
-  const gMax = proj(gb[2], gb[1]);
-  const bounds = {
-    x0: (gMin[0] - x0) * su, x1: (gMax[0] - x0) * su,
-    y0: (gMin[1] - y0) * su, y1: (gMax[1] - y0) * su,
-  };
+  return { all, focus, others, shown, proj, x0, y0, su: W / w, W, H };
+}
 
+// 이동 한계: scene bbox 가 아니라 **지형 데이터 전체 범위**(geo/meta.json 의 bbox).
+// scene bbox 는 처음(⟲) 그림만 정하고, 이동은 지도가 있는 곳 어디로든 갈 수 있다.
+export function frameBounds(f, layers) {
+  const gb = layers && layers.bbox && layers.bbox.length === 4 ? layers.bbox : GEO_BBOX;
+  const gMin = f.proj(gb[0], gb[3]);                  // lon 최소 · lat 최대 → x,y 최소
+  const gMax = f.proj(gb[2], gb[1]);
+  return {
+    x0: (gMin[0] - f.x0) * f.su, x1: (gMax[0] - f.x0) * f.su,
+    y0: (gMin[1] - f.y0) * f.su, y1: (gMax[1] - f.y0) * f.su,
+    W: f.W, H: f.H,
+  };
+}
+
+export function renderScene(svgEl, scene, layers, tokens, view) {
+  const t = { ...DEFAULT_TOKENS, ...(tokens || {}) };
+  const L = layers || {};
+
+  // --- 화면 크기: SVG 에서 실측한 픽셀. 그대로 viewBox 이자 width/height 속성이다 ---
+  const W = Math.max(80, Math.round(svgEl.clientWidth) || DEF_W);
+  const H = Math.max(60, Math.round(svgEl.clientHeight) || DEF_H);
+
+  const f = sceneFrame(scene, W, H);
+  const { all, focus, others, shown, proj, x0, y0, su } = f;
+
+  svgEl.textContent = '';
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgEl.setAttribute('width', W);
+  svgEl.setAttribute('height', H);
+  svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svgEl.setAttribute('role', 'img');
+
+  // 라벨은 이 여백 안쪽에 통째로 들어와야 한다. 화면 크기가 바뀌면 같이 바뀐다.
+  const inside = b =>
+    b[0] >= EDGE && b[2] <= W - EDGE && b[1] >= EDGE && b[3] <= H - EDGE;
+
+  const bounds = frameBounds(f, L);
   const v = clampView(view || BASE_VIEW, bounds);
   const s = su * v.z;
   const P = (lon, lat) => {
@@ -306,6 +333,8 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   // bounds·focusBox 는 app.js 가 이동 한계와 focus 시야를 맞출 수 있게 돌려준다.
   return {
     view: v, labels: drawn.length, shown: shown.length, project: P, bounds, focusBox,
+    // 지금 그린 화면 크기와 틀. app.js 가 리사이즈 때 중심을 붙들고, 조작 좌표를 잰다.
+    W, H, x0, y0, su,
     // 시대 영역: 데이터가 몇 개고 그중 몇 개가 실제로 그려졌는지(라벨 자리·화면 밖 때문에 준다)
     regions: {
       blobs: blobs.length, marks: marks.length,
