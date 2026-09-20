@@ -560,6 +560,26 @@ SVG 크기 = 패널폭 − 1(패널 border-left) − 28(패널 padding) − 2(ma
 | `c-handle-hover.png` | 손잡이 hover — 가장자리 1px 선이 `--accent` 로 물든다 |
 | `c-live-1920-700.png` | **배포본** 1920×1080 에서 같은 드래그 |
 
+## 배포 (02-c)
+
+`e843184` 푸시 → Pages 워크플로 **success** (run 35523550914).
+`curl -s https://sunoeul.github.io/antilego/ | grep -o 'app.js?v=[0-9a-f]*'` → `app.js?v=e843184`.
+`map.js?v=e843184` HTTP/2 200, 배포된 `app.js` 안에 `setPanelW` 7회, `styles.css` 안에 `resizer` 5회.
+
+배포본을 헤드리스 Chrome 1920×1080 · `#1Kgs.12` 로 확인 (`localStorage` 비우고 hard reload):
+
+| | 패널 400 | 손잡이 300px 드래그 → 700 | 새로고침 |
+|---|---|---|---|
+| `window.__antilego.V` | `e843184` | 〃 | 〃 |
+| SVG `width`×`height` | 369 × 277 | **669 × 502** | 669 × 502 |
+| 라벨 수 | 4 | **6** | 6 |
+| `font-size` / `r` | 11 / 2 | **11 / 2** | 11 / 2 |
+| `#verses` 폭 | 640 | **640** | 640 |
+| `localStorage['panelW']` | (없음) | `"700"` | `"700"` |
+| 최대치 | 1184 | 1184 | 1184 |
+
+가로 스크롤 없음(`scrollWidth` 1920), **`console.error` 0건**. 스크린샷 `shots/c-live-1920-700.png`.
+
 ## 벗어난 점 / 남은 것
 
 - **스펙 예시 `652×489` 대신 `669×502`.** 헤드리스 Chrome 에 스크롤바가 없어서 패널 안쪽이
