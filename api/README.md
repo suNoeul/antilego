@@ -1,0 +1,194 @@
+# `api/` — 피드백 수집 함수
+
+정적 사이트(GitHub Pages)는 비밀을 못 가진다. 그래서 "피드백" 버튼이 보내는 POST 를
+받아 **서버 쪽 토큰으로** Notion DB 에 한 줄 쓰는 함수 하나를 Vercel 에 따로 올린다.
+
+- 비상업 전용 (AGENTS.md). Vercel **Hobby** 플랜만 쓴다.
+- 외부 패키지 없음. Node 20+ 의 전역 `fetch` 만 쓴다.
+- 이 디렉토리는 **정적 사이트와 별개의 Vercel 프로젝트**다. `web/` 은 그대로 GitHub Pages 에 있다.
+
+## 폴더 구조
+
+Vercel 은 프로젝트 루트 바로 아래의 `api/` 폴더에 있는 파일을 함수로 만든다.
+이 저장소는 루트를 `Antilego/api` 로 잡으므로 함수는 **`api/api/feedback.js`** 에 있다.
+배포되면 주소는 `https://<프로젝트>.vercel.app/api/feedback` 이다.
+
+```
+api/                     ← Vercel 프로젝트 루트 (vercel --cwd api)
+├── package.json         name: antilego-api, "type": "module"
+├── vercel.json          regions: ["icn1"], maxDuration 10
+├── api/
+│   └── feedback.js      ← 함수 하나. /api/feedback 로 뜬다
+└── test/
+    ├── local.mjs        Vercel 없이 :3300 에 띄우는 어댑터
+    └── notion-mock.mjs  fetch 를 가로채 요청 본문을 검사 (24개)
+```
+
+헷갈리기 쉬운 곳: `api/feedback.js` (루트 바로 아래) 가 아니라 `api/api/feedback.js` 다.
+앞의 `api/` 는 저장소 안에서의 프로젝트 루트, 뒤의 `api/` 는 Vercel 이 정한 함수 폴더 이름이다.
+
+`regions: ["icn1"]`(서울)은 Hobby 에서도 된다 — Hobby 는 **한 지역**까지 허용한다.
+두 개 이상 적으면 빌드 전에 배포가 실패한다.
+
+## 환경변수
+
+| 이름 | 필수 | 설명 |
+|---|---|---|
+| `NOTION_TOKEN` | 예 | Notion 내부 통합(internal integration)의 토큰 (`ntn_…`). 서버에만 둔다 |
+| `NOTION_DB_ID` | 아니오 | 기본값 `8a563b39-003e-4616-89f4-fb2144f90e4f` (📮 Feedback) |
+
+토큰은 응답에도 로그에도 절대 나오지 않는다.
+
+## Notion 쪽 준비 (한 번만)
+
+1. https://www.notion.so/profile/integrations → **New integration** → 내부 통합,
+   워크스페이스 선택. Capabilities 는 **Insert content** 만 있으면 된다 (읽기 불필요).
+2. 토큰(`ntn_…`)을 복사한다.
+3. Notion 에서 **📮 Feedback DB 를 열고** → 오른쪽 위 `⋯` → **연결(Connections)** →
+   방금 만든 통합을 고른다. **이걸 빼먹으면 `object_not_found` 가 난다.**
+4. DB 속성이 아래와 같은지 확인한다 (이름·타입이 정확히 맞아야 한다).
+
+| 속성 | 타입 | 함수가 넣는 값 |
+|---|---|---|
+| `내용` | title | 본문 앞 100자 |
+| `작성자` | rich_text | 이름, 없으면 `익명` |
+| `위치` | rich_text | 읽던 자리 (예: `사사기 9:1`) |
+| `링크` | url | 보낸 페이지 주소 |
+| `시각` | date | **서버**가 찍는 ISO 시각 |
+| `기기` | select | 폰 / 태블릿 / 데스크톱 / 모름 |
+| `상태` | select | 항상 `새로 옴` |
+| `종류` · `반영` · `메모` | select · rich_text · rich_text | 비워 둔다 (사람이 채운다) |
+
+`시각` 의 "시간 포함" 은 보내는 문자열이 정한다 — 함수는 `2026-09-21T03:16:23.996Z` 처럼
+시간이 붙은 ISO 를 보내므로 Notion 이 날짜+시간으로 받는다. API 본문에 `is_datetime`
+같은 필드는 없다. DB 속성 쪽 "시간 포함" 토글도 켜 두면 표에서 시간이 보인다.
+
+## Notion API 버전 — `database_id` vs `data_source_id`
+
+코드는 `Notion-Version: 2022-06-28` 으로 `parent: { database_id }` 를 쓴다.
+
+Notion 이 2025-09-03 버전에서 **데이터 소스(data source)** 를 도입했다. DB 하나가
+데이터 소스 여러 개를 가질 수 있게 되면서, 새 버전에서는 페이지를 만들 때
+`parent: { type: "data_source_id", data_source_id: "…" }` 를 쓴다.
+
+- `2022-06-28` 로 고정해 두면 **데이터 소스가 하나뿐인 DB** 에서는 `database_id` 가 계속 동작한다.
+  옛 버전을 끄겠다는 일정은 Notion 이 아직 내놓지 않았다.
+- 누군가 📮 Feedback DB 에 **두 번째 데이터 소스를 붙이는 순간** 400
+  (`Databases with multiple data sources are not supported in this API version`) 이 난다.
+- 그때는 `feedback.js` 의 `NOTION_VERSION` 을 `2025-09-03` 이상으로 올리고
+  `notionPayload()` 의 `parent` 를 아래로 바꾼다. 나머지(properties, children)는 그대로다.
+
+```js
+parent: { type: 'data_source_id', data_source_id: 'ecef24df-41c2-43d1-aecf-76ce0052908d' }
+```
+
+이 DB 의 데이터 소스 id 는 **`ecef24df-41c2-43d1-aecf-76ce0052908d`** 다.
+
+참고: https://developers.notion.com/docs/upgrade-faqs-2025-09-03
+
+## 요청 · 응답
+
+`POST /api/feedback`, `Content-Type: application/json`
+
+```json
+{ "name": "눈", "text": "…", "loc": "사사기 9:1",
+  "url": "https://sunoeul.github.io/antilego/#Judg.9",
+  "device": "폰", "hp": "", "ts": 1758400000000 }
+```
+
+| 필드 | 규칙 |
+|---|---|
+| `text` | **필수**, 2000자까지 |
+| `name` | 40자까지. 비면 `익명` |
+| `loc` | 120자까지 (넘으면 자른다) |
+| `url` | `https://sunoeul.github.io/antilego/` 또는 `http://localhost` 로 시작해야 저장. 아니면 버린다 |
+| `device` | `폰`·`태블릿`·`데스크톱` 중 하나. 아니면 `모름` |
+| `hp` | **허니팟.** 사람 눈에 안 보이는 칸. 채워져 있으면 200 을 주고 아무것도 저장하지 않는다 |
+| `ts` | 받기만 하고 **무시**한다. 시각은 서버가 찍는다 |
+
+응답은 `{"ok":true}` 또는 `{"ok":false,"error":"한국어 문장"}`.
+
+| 코드 | 언제 |
+|---|---|
+| 200 | 저장됨 (또는 허니팟에 걸림) |
+| 400 | 검증 실패 · JSON 아님 |
+| 403 | `Origin` 이 허용 목록 밖 |
+| 405 | POST·OPTIONS 아님 |
+| 429 | 레이트 리밋 (`Retry-After` 붙음) |
+| 500 | `NOTION_TOKEN` 미설정 |
+| 502 | Notion 이 거절했거나 닿지 않음 |
+
+## CORS
+
+`Access-Control-Allow-Origin` 은 아래에만 그대로 되돌려 준다. 그 밖의 `Origin` 은 403.
+`Origin` 헤더가 아예 없는 요청(curl 등)은 통과시킨다.
+
+- `https://sunoeul.github.io`
+- `http://localhost:*` · `http://127.0.0.1:*` (개발 중 포트가 바뀌어서 포트는 안 가린다)
+
+프리플라이트(`OPTIONS`)는 204 에 `POST, OPTIONS` / `Content-Type` / `Max-Age: 86400`.
+
+## 레이트 리밋 — best-effort
+
+`x-forwarded-for` 첫 값 기준으로 **1분 5개 · 하루 30개**. 인스턴스 메모리의 `Map` 이라
+서버리스에서 인스턴스가 여러 개 뜨면 **각각 따로 센다**. 콜드 스타트에도 초기화된다.
+그래서 정확한 방어가 아니라 실수·단순 스팸을 거르는 용도다. 진짜로 막아야 할 일이
+생기면 Vercel WAF 의 rate limit 나 외부 KV 로 옮긴다.
+
+## 배포
+
+`vercel login` 은 미리 해 둔다.
+
+```bash
+cd /Users/snow/Workspace/Antilego
+
+# 1. 프로젝트 연결 (처음 한 번). 루트를 api/ 로 잡는다
+vercel link --cwd api            # 대화형: 프로젝트 이름 antilego-api 권장
+
+# 2. 환경변수 (붙여넣기 프롬프트가 뜬다)
+vercel env add NOTION_TOKEN production --cwd api
+vercel env add NOTION_TOKEN preview    --cwd api     # 미리보기에서도 쓰려면
+vercel env add NOTION_DB_ID production --cwd api     # 기본값을 쓸 거면 생략 가능
+
+# 3. 배포
+vercel --cwd api                 # 미리보기
+vercel --prod --cwd api          # 운영
+
+# 4. 확인
+vercel env ls --cwd api
+vercel logs <배포주소> --cwd api
+```
+
+`--cwd api` 대신 `cd api && vercel …` 도 똑같다. `.vercel/` 은 `.gitignore` 에 넣는다.
+
+배포된 주소를 `web/` 의 피드백 버튼에 적어 넣는다 (그쪽은 다른 에이전트 담당).
+
+## 확인용 curl
+
+```bash
+API=https://<프로젝트>.vercel.app/api/feedback
+
+# 프리플라이트
+curl -i -X OPTIONS "$API" \
+  -H 'Origin: https://sunoeul.github.io' \
+  -H 'Access-Control-Request-Method: POST'
+
+# 제출
+curl -i -X POST "$API" \
+  -H 'Origin: https://sunoeul.github.io' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"눈","text":"사사기 9장 지도에서 세겜 점이 안 보입니다.","loc":"사사기 9:1","url":"https://sunoeul.github.io/antilego/#Judg.9","device":"폰","hp":"","ts":0}'
+# → {"ok":true}
+```
+
+## 로컬에서 돌려 보기 (Vercel 불필요)
+
+```bash
+cd api
+node test/notion-mock.mjs          # 24개 검사. 네트워크 안 씀
+MOCK_NOTION=1 node test/local.mjs  # :3300. Notion 으로 보낼 본문을 콘솔에 찍는다
+NOTION_TOKEN=ntn_… node test/local.mjs   # 진짜 Notion 에 쓴다
+```
+
+`MOCK_NOTION=1` 모드는 `web/` 쪽에서 버튼을 붙일 때 쓰면 된다 —
+`http://localhost:3300/api/feedback` 로 쏘면 CORS 도 그대로 확인된다.
