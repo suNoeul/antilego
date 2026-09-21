@@ -191,6 +191,28 @@
 | `mobile-chip-ㄱ.png` | 칩 `ㄱ ×` 활성 |
 | `mobile-chapters.png` | 2단계 — `← 뒤로 창세기`, 장 격자 |
 | `mobile-verses.png` | 3단계 — `← 뒤로 창세기 › 12장`, 절 20 |
+| `live-desktop-filter.png` | **배포본** 1400×900 에서 `ㄱ` 을 실제로 타이핑한 모습 |
+
+## 배포
+
+`22d4e0c` 푸시 → Pages 워크플로 **success** (run 35556740676).
+`curl -s https://sunoeul.github.io/antilego/ | grep -o 'app.js?v=[0-9a-f]*'` → `app.js?v=22d4e0c`.
+배포된 `index.json` 첫 권에 `"en":"Genesis"` · `"group":"율법서"` 가 들어 있고,
+배포된 `app.js` 안에 `openPicker`/`koPrefix` 8회, `styles.css` 안에 `chip-ot` 5회.
+
+배포본을 헤드리스 Chrome 으로 확인 (`localStorage` 비우고 hard reload):
+
+| | 관측값 |
+|---|---|
+| `window.__antilego.V` | `22d4e0c` |
+| 상단바 | `사사기 9장` |
+| 피커 열림 · 포커스 | `#pick-q`, 권 66 · 장 21 · 절 57 |
+| `ㄱ` (실제 타이핑) | 에스겔·고린도전서·고린도후서·갈라디아서·골로새서·요한계시록 |
+| `삿 9:3` + `Enter` | `#Judg.9`, 3절 `verse-hl`, 피커 닫힘 |
+| 모바일 360×800 칩 `ㄱ` | 같은 6권, `scrollWidth` **360** |
+| `console.error` | **0건** (데스크톱·모바일 둘 다) |
+
+스크린샷 `shots/live-desktop-filter.png`.
 
 ## 벗어난 점 / 남은 것
 
