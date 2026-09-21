@@ -682,3 +682,78 @@ python3 spikes/03-eras/validate.py
 - `docs/03-prototype-spec.md` 는 데이터 스키마 절만 건드렸다 — `attribution.json` 본문,
   그리고 새 절 "밑줄 규칙 보강 — 낱말 경계", "빌드 계약". UI 절은 06-b 것.
 - 노션 반영 필요 (Decisions 한 줄).
+
+## 06-live 검증
+
+2026-09-21 · 대상 **배포된 사이트** <https://sunoeul.github.io/antilego/> (커밋 `5e5b233`) ·
+기준 위의 06-a / 06-b / 06-c 절과 `spikes/review-01-codex/REVIEW.md`
+
+로컬이 아니라 **GitHub Pages 에 실제로 올라간 것**을 다시 확인했다. 헤드리스 Chrome
+(`--headless=new --remote-debugging-port=9371`, Chrome 153.0.8010.52) + Node 25.8.1 내장 WebSocket 으로
+CDP 직접 호출. **`Network.setCacheDisabled(true)`** 를 먼저 걸고 시작했다 — 06-b 가 겪은 옛 응답 문제를
+피하기 위해서다. `Emulation.setDeviceMetricsOverride` 로 1400×900(데스크톱) · 360×800(`mobile:true`),
+`setEmulatedMedia` 로 `prefers-color-scheme: light` 고정. 첫 방문은 `localStorage.clear()` 후 재적재.
+
+**라이브 API 에는 아무것도 보내지 않았다.** 피드백 카드는 열어서 상태만 읽고 `취소` 로 닫았다
+(`#fb-send` 는 누르지 않았다).
+
+### 결과 — 30개 확인, 0 실패
+
+| # | 확인 | 관측값 | 판정 |
+|---|---|---|:--:|
+| 1 | 배포 버전 | `app.js?v=5e5b233` (HTML 안의 `?v=` 는 이 하나뿐) | ✅ |
+| 1 | F4 시대 파일 3종 | `data/eras.json` 200 · `data/chapter_eras.json` 200 · `data/geo/era_regions.json` 200 | ✅ |
+| 2 | F3 `#Exod.1` ‹ | `#Gen.50` | ✅ |
+| 2 | F3 `#Lev.1` ‹ | `#Exod.40` | ✅ |
+| 2 | F3 `#Matt.1` ‹ | `#Mal.4` | ✅ |
+| 2 | F3 `#Gen.50` › | `#Exod.1` | ✅ |
+| 2 | F3 `#Rev.22` › | `#Rev.22` (제자리) | ✅ |
+| 2 | F3 360px `#Exod.1` ‹ | `#Gen.50` | ✅ |
+| 3 | F10 `#Foo.999` | `#Josh.10` 으로 복귀 · `state` 유효 | ✅ |
+| 3 | F10 `localStorage.last` | `Josh.10` — 유효 | ✅ |
+| 4 | F1 계 1:9 | `밧모` 버튼 1개 · 패널 「밧모 / Patmos / 이 장에서 1회 · 성경 전체 1회」 | ✅ |
+| 4 | F1 마 11:21 | `["고라신","벳새다","두로","시돈"]` | ✅ |
+| 4 | F1 마 8:28 | `["가다라"]` | ✅ |
+| 4 | F6 행 2:14 | `["예루살렘"]` — `유대인` 은 버튼 아님(글자만) | ✅ |
+| 4 | F6 겔 27:19 | 버튼 0개 — 「19 워단과 야완은…」 에 `단` 버튼 없음 | ✅ |
+| 4 | F6 삿 9:21 | `["브엘"]` — 버튼으로 남아 있다 | ✅ |
+| 4 | sanity 행 27 | `button.place` **25** | ✅ |
+| 4 | sanity 수 10 | `button.place` **70** | ✅ |
+| 5 | F11 푸터 앵커 | **6개, 전부 `rel="noopener"`** (`target="_blank"`) | ✅ |
+| 5 | F11 creativecommons.org | `https://creativecommons.org/licenses/by/4.0/` ×2 | ✅ |
+| 5 | F11 openbible.info | `https://www.openbible.info/geo/` | ✅ |
+| 6 | 시대 레이어 (`#1Kgs.12`) | `#z-era` `aria-pressed=true` · `.region-blob` **5개** | ✅ |
+| 6 | 시대 캡션 | 「분열왕국 시대 · 기원전 930–586년경 — …」 표시 · `대략` 배지 켜짐 | ✅ |
+| 7 | 피커 `ㄱ` 필터 | **6권** — 겔 · 고전 · 고후 · 갈 · 골 · 계 | ✅ |
+| 7 | 피드백 카드 | 열림 · 위치 줄 「위치: 사사기 9장 1절 ×」 · `보내기` disabled | ✅ |
+| 7 | 360px 삿 9 + 패널 | `scrollWidth` **360** (`documentElement` · `body` 둘 다) | ✅ |
+| 7 | 360px 삿 9 + 피커 | `scrollWidth` **360** | ✅ |
+| 8 | `console.error` | **0** | ✅ |
+| 8 | 미처리 예외 | **0** | ✅ |
+| 8 | 네트워크 4xx/5xx | **0** | ✅ |
+
+푸터 전문(라이브):
+
+```
+성경전서 개역한글판 (대한성서공회, 저작재산권 만료 · 성명표시) — 변경: 없음 — 원문 그대로 ·
+OpenBible.info Bible Geocoding (CC BY 4.0) — 변경: 장소 선별·좌표 대표점 선택·한글 지명 매핑 ·
+STEPBible TIPNR (Tyndale House, Cambridge, CC BY 4.0) — 변경: 동명이지 식별에 사용 ·
+Natural Earth 1:10m (public domain) — 변경: bbox 클리핑·단순화
+```
+
+링크 6개: `bskorea.or.kr` · `openbible.info/geo` · `creativecommons.org/licenses/by/4.0` ·
+`github.com/STEPBible/STEPBible-Data` · `creativecommons.org/licenses/by/4.0` · `naturalearthdata.com`.
+
+스크린샷 `spikes/06-review-fixes/shots/`: `live-exod1-prev.png`(출 1 ‹ → 창세기 50장) ·
+`live-rev1-patmos.png`(계 1장, `밧모` 선택 · 에게해 지도 · 초대교회·서신 시대 캡션) ·
+`live-footer.png`(수 10장 푸터 4행) · `live-mobile-judg9.png`(360×800 삿 9장, 시트 열림).
+
+### 눈에 띈 것
+
+- 로컬 검증(06-b)에서 3건 나왔던 네트워크 4xx 는 **라이브에서 0**이다. 그쪽은 `?data=data-fixture`
+  픽스처에만 있던 시대 파일 부재였고, 배포본은 실제 `data/` 를 쓴다.
+- 시대 캡션은 `#z-era` 레이어를 **꺼 둔 상태에서도** 패널에 나온다(`live-rev1-patmos.png`).
+  blob 만 레이어에 묶여 있고 캡션은 별개 — 설계대로다.
+- 360px 에서 플로팅 버튼(`피드백` · `닫기`)이 본문 2절 위에 겹쳐 보인다. 떠 있는 버튼이니
+  의도된 모양이지만, 시트가 열린 상태에서 가려지는 글자가 생기는 건 사실이다. 판정은 안 내린다.
+- `#Foo.999` 복구 때 잠깐 보이는 한국어 에러 문구는 06-b 가 적어 둔 그대로 라이브에서도 지나간다.
