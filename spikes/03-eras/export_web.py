@@ -3,7 +3,6 @@
   data/derived/eras.json          -> web/data/eras.json          (UI 가 쓰는 필드만)
   data/derived/chapter_eras.json  -> web/data/chapter_eras.json  (주석·note 제거)
   data/derived/era_regions.json   -> web/data/geo/era_regions.json (blob 에 rep 좌표 추가)
-  data/derived/korea_parallel.json-> web/data/korea_parallel.json  (PoC 07, 주석 제거)
 
 돌리는 법 (의존성 없음, 표준 파이썬):
     python3 spikes/03-eras/export_web.py
@@ -26,9 +25,6 @@ WEB = ROOT / "web" / "data"
 
 # UI 가 쓰는 필드만 남긴다. en / approx_from / approx_to / anchor_places_en 는 빠진다.
 ERA_FIELDS = ("id", "ko", "approx", "caption", "note")
-
-# PoC 07 (동시대 한반도). UI 는 title / caption / basis 만 쓴다. note 는 근거 메모라 나가지 않는다.
-KOREA_FIELDS = ("title", "caption", "basis")
 
 
 def ring_area(ring):
@@ -162,27 +158,6 @@ def main():
         },
     )
 
-    # --- korea_parallel.json (PoC 07): _notes 와 era 별 note 를 뺀 그대로.
-    # 파일이 없으면 조용히 건너뛴다 — 실험이 꺼져 있어도 빌드는 돌아간다.
-    src_kor_path = DERIVED / "korea_parallel.json"
-    n_kor = 0
-    n_kor_eras = 0
-    if src_kor_path.exists():
-        src_kor = json.loads(src_kor_path.read_text(encoding="utf-8"))
-        kor_eras = {
-            eid: {k: v[k] for k in KOREA_FIELDS if v.get(k)}
-            for eid, v in (src_kor.get("eras") or {}).items()
-        }
-        n_kor_eras = len(kor_eras)
-        n_kor = dump(
-            WEB / "korea_parallel.json",
-            {
-                "version": src_kor.get("version", 1),
-                "basis": src_kor.get("basis", ""),
-                "eras": kor_eras,
-            },
-        )
-
     blob = sum(1 for f in feats if f["properties"]["render"] == "blob")
     print(f"web/data/eras.json            {n_eras:,} B   시대 {len(eras)}개")
     print(f"web/data/chapter_eras.json    {n_ch:,} B   책 {len(ch)}권")
@@ -190,10 +165,6 @@ def main():
         f"web/data/geo/era_regions.json {n_reg:,} B   Feature {len(feats)}개 "
         f"(blob {blob} · label_only {len(feats) - blob})"
     )
-    if n_kor:
-        print(f"web/data/korea_parallel.json  {n_kor:,} B   시대 {n_kor_eras}개 (PoC 07)")
-    else:
-        print("web/data/korea_parallel.json  없음 — data/derived/korea_parallel.json 이 없다 (PoC 07 꺼짐)")
 
 
 if __name__ == "__main__":

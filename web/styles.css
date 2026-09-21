@@ -422,31 +422,6 @@ body.panel-open .fabs { right: var(--panel-w); }
 }
 .era-note[hidden] { display: none; }
 
-/* --- PoC 07 (실험): 동시대 한반도. 플래그 ?korea=1 일 때만 DOM 에 생긴다. --- */
-.korea-toggle {
-  font: inherit;
-  font-size: 12px;
-  color: inherit;
-  background: none;
-  border: 0;
-  padding: 0;
-  margin-left: 6px;
-  cursor: pointer;
-  opacity: .85;
-  white-space: nowrap;
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-}
-.korea-toggle:hover { background: var(--hl-soft); border-radius: 3px; }
-.korea-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.korea-line {
-  font-size: 12px;
-  line-height: 1.65;
-  margin: 6px 0 0;
-}
-.korea-line[hidden] { display: none; }
-.korea-basis { opacity: .7; }
-
 /* 시대 영역 레이어를 켰을 때만 뜨는 것 두 가지 — 지도 왼쪽 위 배지, 빈 시대 안내. */
 .era-badge {
   position: absolute;

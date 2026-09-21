@@ -31,18 +31,7 @@ const vh = () => state.render?.H || DEF_H;
 const ls = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* 무시 */ } },
-  del(k) { try { localStorage.removeItem(k); } catch { /* 무시 */ } },
 };
-
-// --- PoC 07 (실험): 동시대 한반도 한 줄. 플래그 뒤에 숨겨 둔다 ---
-// `?korea=1` 로 켜고 localStorage 에 기억한다. `?korea=0` 은 끄고 기억도 지운다.
-// 주소에 아무것도 없으면 기억한 값을 쓴다. 기본은 꺼짐 — 그냥 들어온 사람은 존재를 모른다.
-const KOREA = (() => {
-  const v = new URLSearchParams(location.search).get('korea');
-  if (v === '1') { ls.set('korea', '1'); return true; }
-  if (v === '0') { ls.del('korea'); return false; }
-  return ls.get('korea') === '1';
-})();
 
 const state = {
   index: null, places: {}, layers: {}, attr: [],
@@ -53,7 +42,6 @@ const state = {
   // 시대 (Spike 03-d). 못 받으면 전부 null 인 채로 조용히 동작한다 — 캡션도 레이어도 없다.
   eras: null, chapterEras: null, regionsByEra: null,
   eraLayer: false,                               // 시대 영역 레이어. 기본 꺼짐
-  korea: null,                                   // PoC 07. 플래그가 켜졌을 때만 채운다
   pendingVerse: null,                            // 성경 찾기에서 고른 절 (장 이동 후 스크롤)
 };
 
@@ -69,18 +57,6 @@ function eraOf(book, ch) {
 }
 // 이 시대의 영역. 시대를 특정하지 않는 장(원시사·시대 불특정)은 빈 배열이 정상이다.
 const regionsOf = era => (era && state.regionsByEra?.[era.id]) || [];
-
-// --- PoC 07: 동시대 한반도 데이터 ---
-// 플래그가 켜졌을 때만, 그리고 캡션을 처음 그릴 때 한 번만 받는다. 꺼져 있으면 요청 자체가 없다.
-// 못 받으면 빈 객체로 두고 아무것도 띄우지 않는다 (에러 문구 없음 — 03-d 와 같은 태도).
-let koreaPending = null;
-function ensureKorea() {
-  if (!KOREA || state.korea || koreaPending) return;
-  koreaPending = getJSON('korea_parallel.json')
-    .then(d => { state.korea = d?.eras || {}; renderEra(); })
-    .catch(() => { state.korea = {}; });
-}
-const koreaOf = era => (KOREA && era && state.korea?.[era.id]) || null;
 
 const getJSON = async path => {
   const r = await fetch(bust(DATA_BASE + path));
@@ -278,7 +254,6 @@ function renderEra() {
   const cap = $('era-caption');
   const era = eraOf(state.book, state.ch);
   const regions = regionsOf(era);
-  ensureKorea();                              // PoC 07. 플래그가 꺼져 있으면 아무 일도 하지 않는다
 
   cap.textContent = '';
   const show = !!era && !era.undated;
@@ -316,37 +291,6 @@ function renderEra() {
         note.hidden = !note.hidden;
         name.setAttribute('aria-expanded', String(!note.hidden));
       });
-    }
-
-    // --- PoC 07 (실험): 동시대 한반도 한 줄 ---
-    // 플래그가 켜져 있고 **이 시대에 기록이 있을 때만** DOM 을 만든다.
-    // 기록이 없는 시대에는 토글도 줄도 없다 — 빈칸이 없는 확신보다 낫다 (AGENTS.md).
-    // 캡션이 숨는 원시사·시대 불특정에서는 이 블록 자체에 오지 않는다.
-    const kor = koreaOf(era);
-    if (kor) {
-      const kline = document.createElement('p');
-      kline.className = 'korea-line';
-      kline.id = 'korea-line';
-      kline.hidden = true;                      // 기본 접힘. 상태는 기억하지 않는다
-      kline.append(`이 무렵 한반도 — ${kor.title}: ${kor.caption}`);
-      if (kor.basis) {
-        const b = document.createElement('span');
-        b.className = 'korea-basis';
-        b.textContent = ` (${kor.basis})`;
-        kline.append(b);
-      }
-      const t = document.createElement('button');
-      t.type = 'button';
-      t.className = 'korea-toggle';
-      t.textContent = '한반도는?';
-      t.setAttribute('aria-expanded', 'false');
-      t.setAttribute('aria-controls', 'korea-line');
-      t.addEventListener('click', () => {
-        kline.hidden = !kline.hidden;
-        t.setAttribute('aria-expanded', String(!kline.hidden));
-      });
-      line.append(t);
-      cap.append(kline);
     }
   }
 
@@ -1474,7 +1418,6 @@ async function boot() {
   window.__antilego = {
     state, drawMap, setPanel, anchor, fitFocus, renderPanel, V,
     setEraLayer, renderEra, eraOf, regionsOf,
-    KOREA, koreaOf, ensureKorea,               // PoC 07 (실험)
     setPanelW, saveW, panelMax, relayout, mapSize, scene,
     // 성경 찾기 (Spike 04)
     pick, openPicker, closePicker, renderPicker, rebuildList,
