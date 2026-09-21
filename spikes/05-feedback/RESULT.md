@@ -445,3 +445,31 @@ Failed to load resource: the server responded with a status of 429 (Too Many Req
 - **`aria-modal` 을 걸지 않았다.** 카드는 본문을 가두지 않는 팝오버라서, 뒤 본문을 읽으면서
   쓰는 게 자연스럽다. 포커스 트랩도 없다 — `Tab` 이면 카드 밖으로 나간다.
 - **스크린 리더로 실제 읽어 보지 않았다.** `role="status"` 로 알림 줄을 표시했을 뿐이다.
+
+## 배포
+
+`5bd78d9` 푸시 → Pages 워크플로 **success** (run 35559578065).
+`curl -s https://sunoeul.github.io/antilego/ | grep -o 'app.js?v=[0-9a-f]*'` → `app.js?v=5bd78d9`.
+배포된 `app.js` 안에 `FEEDBACK_URL` 3회.
+
+배포본을 헤드리스 Chrome 으로 확인 (`localStorage` 비우고 hard reload):
+
+| | 관측값 |
+|---|---|
+| `window.__antilego.V` | `5bd78d9` |
+| 상단바 | `사사기 9장` |
+| `피드백` 알약 | 있다 |
+| `FEEDBACK_URL` | `https://antilego-api.vercel.app/api/feedback` |
+| 푸터 안내 | `읽다가 이상하면 오른쪽 '피드백' 버튼을 눌러 주세요.` |
+| 카드 열림 · 위치 줄 | `사사기 9장 1절` |
+| 카드 `z-index` / 폭 | **70** / **360px** |
+| 타이핑 → `보내기` | 눌린다 |
+| **CORS 프리플라이트** (배포본에서 실제 `OPTIONS`) | **204** — 출처 `https://sunoeul.github.io` 가 허용 목록에 있다 |
+| `Esc` | 닫힘 |
+| 모바일 360×800 바닥 시트 | `left 0 · width 360 · bottom 0`, 가로 스크롤 **360** |
+| `console.error` | **0건** (데스크톱·모바일 둘 다, error 수준 `Log` 도 0건) |
+
+스크린샷 `shots/live-desktop-card.png`.
+
+**노션 반영 필요** — `Decisions` 에 "피드백 위치는 텍스트에어리어 접두사가 아니라 따로 한 줄
+(`위치: … ×`)로 둔다 — `loc` 를 깨끗하게 남기려고" 한 줄.
