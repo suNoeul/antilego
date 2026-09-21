@@ -186,4 +186,24 @@ Spike 04 는 마지막 두 경우에 1장으로 옮기고 피커를 **열어 둔
 
 ## 배포
 
-<!-- 배포 기록은 라이브 검증 커밋에서 채운다 -->
+`f670e90` 푸시 → Pages 워크플로 **success** (run 35621346103).
+`curl -s https://sunoeul.github.io/antilego/ | grep -o 'app.js?v=[0-9a-f]*'` → `app.js?v=f670e90`.
+배포된 `app.js` 안에 `goChapterStart` 5회, `styles.css` 안에 `pick-whole` 4회.
+
+배포본을 헤드리스 Chrome 으로 확인했다 (`verify/live.mjs`, `localStorage` 비우고 hard reload).
+**26 단언 전부 PASS · `console.error` 0건.**
+
+| | 관측값 |
+|---|---|
+| `window.__antilego.V` | `f670e90` |
+| 권 클릭(창세기) | hash `#Judg.9` 그대로 |
+| **장 클릭(12)** | **hash `#Judg.9` 그대로**, 뒤 본문 `사사기 9장`, 상단바 `사사기 9장`, 피커 열린 채, 절 열 **20**, 머리 `절 · 창세기 12장` |
+| 절 클릭(9) | `#Gen.12`, 본문 `창세기 12장`, 9절 `verse-hl` + 화면 안, 피커 닫힘 |
+| `Enter`(장 격자) | `#Gen.12`, 닫힘, `scrollY 0` |
+| `삿 9:3` + `Enter` | `#Judg.9`, 3절 `verse-hl`, 닫힘 |
+| 모바일 360×800 권 탭 | 2단계, hash 그대로 |
+| 모바일 장 탭(12) | 3단계, **hash 그대로**, breadcrumb `창세기 › 12장`, 절 20, 링크 `12장 처음부터 보기`, `scrollWidth` **360** |
+| 모바일 `12장 처음부터 보기` | `#Gen.12`, 닫힘, `scrollY 0`, 본문 `창세기 12장` |
+
+스크린샷 `shots/live-desktop-chapter-picked.png` · `live-desktop-verse-jump.png` ·
+`live-mobile-verses.png` · `live-mobile-after.png`.

@@ -62,6 +62,7 @@ cd spikes/07-picker-verse-nav/verify
 node desktop.mjs      # 1400×900
 node mobile.mjs       # 360×800 (mobile: true)
 node fetchfail.mjs    # 절 수 fetch 실패 경로
+node live.mjs         # 배포본 (https://sunoeul.github.io/antilego/)
 ```
 
 각 스크립트는 `PASS/FAIL` 한 줄씩과 `console.error` 건수, 마지막에 `FAILS: n` 을 찍고
