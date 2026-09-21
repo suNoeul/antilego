@@ -226,6 +226,19 @@ html { overflow-x: hidden; }
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
+/* 출처 링크 (06-b, F11). 한 줄 그대로 두되 따라갈 수 있게만 — 색은 본문 글자색을
+   빌려 쓰고 밑줄만 옅게 긋는다. 넘치면 줄바꿈하고, 한 출처 안에서는 끊기지 않게. */
+.attr .attr-item { display: inline; }
+.attr a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  opacity: .85;
+}
+.attr a:hover { color: var(--ink); opacity: 1; }
+.attr a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
 /* 피드백 안내 한 줄 (05-b). 출처보다 한 겹 더 옅게, 선은 한 번만 긋는다. */
 .attr .attr-fb {
   border-top: 0;
@@ -935,6 +948,10 @@ body.panel-open .fb-card { right: calc(var(--panel-w) + 84px); }
 .fb-in::placeholder { color: var(--muted); }
 .fb-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--hl); }
 .fb-text { line-height: 1.6; resize: none; }
+/* 보내는 중 잠김 (06-b, F9). 꺼진 칸처럼 보이되 글은 그대로 읽힌다. */
+.fb-in:disabled { opacity: .6; cursor: default; }
+.fb-loc-x:disabled { opacity: .4; cursor: default; }
+.fb-loc-x:disabled:hover { color: var(--muted); background: none; }
 
 /* 허니팟 — 눈에도 스크린 리더에도 잡히지 않게. */
 .fb-hp {

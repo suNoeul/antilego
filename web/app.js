@@ -2,6 +2,8 @@
 // 지도는 패널 하나뿐이다. 기본 닫힘 → 플로팅 버튼이나 지명 클릭으로 연다.
 import { renderScene, clampView, zoomAt, sceneFrame, BASE_VIEW, DEF_W, DEF_H }
   from './map.js?v=__V__';
+// 권 경계 이동과 해시 검증은 DOM 없는 순수 함수로 뺐다 (06-b, 리뷰 F3·F10).
+import { stepRef, isValidRef } from './nav.js?v=__V__';
 
 // 배포 버전. GitHub Pages 워크플로가 __V__ 를 커밋 SHA 앞 7자리로 바꾼다.
 // 로컬에서는 바뀌지 않은 채로도 그냥 동작한다 (그냥 쿼리 문자열이다).
@@ -79,6 +81,13 @@ function go(book, ch, sel) {
   const h = '#' + book + '.' + ch + (sel ? '/' + sel : '');
   if (location.hash === h) return;
   location.hash = h;
+}
+// 잘못된 해시를 고칠 때만 쓴다 (F10). 히스토리에 새 칸을 만들지 않으므로
+// 뒤로를 눌러도 잘못된 주소로 되돌아갔다가 다시 튕기는 고리가 생기지 않는다.
+function goReplace(book, ch) {
+  const h = '#' + book + '.' + ch;
+  if (location.hash === h) return;
+  location.replace(location.pathname + location.search + h);
 }
 
 // --- 장면 ---
@@ -168,6 +177,15 @@ function relayout() {
 function scheduleRelayout() {
   if (relayoutRaf) return;
   relayoutRaf = requestAnimationFrame(() => { relayoutRaf = 0; relayout(); });
+}
+
+// 휠·드래그·핀치도 같은 방식으로 묶는다 (리뷰 운영 보충). state.view 는 이벤트마다
+// 그대로 갱신하고, 실제로 SVG 를 다시 그리는 것만 프레임당 한 번 — 언제나 최신 view 로.
+// 버튼(+ − ⟲)·더블클릭은 한 번뿐이라 그냥 즉시 그린다.
+let drawRaf = 0;
+function scheduleDraw() {
+  if (drawRaf) return;
+  drawRaf = requestAnimationFrame(() => { drawRaf = 0; drawMap(); });
 }
 
 // 선택된 지명은 점과 라벨이 통째로 화면 안(여백 FIT)에 들어와야 한다.
@@ -347,33 +365,42 @@ function showMsg(text) {
   $('verses').append(p);
 }
 
-async function loadChapter() {
-  const b = bookOf(state.book);
-  $('title').textContent = (b ? b.ko : state.book) + ' ' + state.ch + '장';
+// 장 요청 토큰 (F2). apply() 마다 하나씩 올라간다. 응답이 돌아왔을 때 이 값이
+// 그 사이에 바뀌었으면 — 더 새로운 장을 이미 요청했다는 뜻이므로 — 아무것도 하지 않는다.
+// 상태·DOM·스크롤·선택 어느 것도 옛 응답이 건드리지 못한다.
+let reqToken = 0;
+const stale = token => token !== reqToken;
+
+async function loadChapter(token) {
+  const book = state.book, ch = state.ch;        // 요청 시점의 장을 묶어 둔다
+  const b = bookOf(book);
+  $('title').textContent = (b ? b.ko : book) + ' ' + ch + '장';
   $('verses').textContent = '';
   state.data = null;
+  let data;
   try {
-    state.data = await getJSON(`books/${state.book}/${state.ch}.json`);
+    data = await getJSON(`books/${book}/${ch}.json`);
   } catch {
+    if (stale(token)) return;                    // 진 요청의 실패는 화면에 띄우지 않는다
     showMsg('이 장을 불러오지 못했습니다. 데이터가 아직 없을 수 있습니다.');
     return;
   }
+  if (stale(token)) return;                      // 이긴 응답만 본문을 그린다
+  state.data = data;
+  $('verses').textContent = '';
   const frag = document.createDocumentFragment();
-  for (const v of state.data.verses) frag.append(renderVerse(v));
+  for (const v of data.verses) frag.append(renderVerse(v));
   $('verses').append(frag);
 }
 
 // --- 상단바 ---
 // 셀렉트 두 개는 Spike 04 에서 사라졌다. 지금 위치를 글자로 보여 주는 버튼 하나뿐이고,
 // 누르면 `성경 찾기` 가 열린다.
+// 계산은 nav.js 의 stepRef 가 한다. 여기는 결과를 해시에 옮기기만 한다 (F3).
 function step(d) {
-  const books = state.index.books;
-  const i = books.findIndex(b => b.id === state.book);
-  if (i < 0) return;
-  let ch = state.ch + d, bi = i;
-  if (ch < 1) { bi = i - 1; if (bi < 0) return; ch = books[bi].chapters; }
-  if (ch > books[i].chapters) { bi = i + 1; if (bi >= books.length) return; ch = 1; }
-  go(books[bi].id, ch, null);
+  const r = stepRef(state.index, state.book, state.ch, d);
+  if (!r) return;
+  go(r.book, r.ch, null);
 }
 function syncNav() {
   const books = state.index.books;
@@ -385,18 +412,37 @@ function syncNav() {
 }
 
 // --- 라우트 적용 ---
+// 돌아갈 곳: 지금 읽던 장 → 저장된 last → 창 1. 셋 다 isValidRef 를 통과한 것만 쓴다 (F10).
+function lastValidRef() {
+  if (isValidRef(state.index, state.book, state.ch)) return { book: state.book, ch: state.ch };
+  const m = /^(\w+)\.(\d+)$/.exec(ls.get('last') || '');
+  if (m && isValidRef(state.index, m[1], +m[2])) return { book: m[1], ch: +m[2] };
+  return { book: 'Gen', ch: 1 };
+}
+
 async function apply() {
   const r = parseHash();
-  if (!r) { location.hash = '#Gen.1'; return; }
+  // 형식이 맞아도 없는 권·범위 밖 장이면 상태에도 localStorage 에도 넣지 않는다 (F10).
+  if (!r || !isValidRef(state.index, r.book, r.ch)) {
+    const f = lastValidRef();                  // 되돌아갈 곳을 먼저 정한다 (state 를 지우기 전에)
+    showMsg('이 장을 불러오지 못했습니다. 데이터가 아직 없을 수 있습니다.');
+    state.ch = null;                           // 본문을 지웠으니 되돌아갈 때 다시 그리게 한다
+    goReplace(f.book, f.ch);
+    return;
+  }
   const changed = r.book !== state.book || r.ch !== state.ch;
   const selChanged = r.sel !== state.sel;
   state.book = r.book; state.ch = r.ch;
   state.sel = r.sel;
 
   if (changed) {
+    // 토큰은 **실제로 장을 부를 때만** 올린다. 같은 장을 가리키는 apply() (부팅 직후 해시
+    // 이벤트가 한 번 더 오는 경우)가 이미 뜬 요청을 죽이지 않게 하려는 것이다.
+    const token = ++reqToken;
     syncNav();
     ls.set('last', state.book + '.' + state.ch);
-    await loadChapter();
+    await loadChapter(token);
+    if (stale(token)) return;       // 그 사이 다른 장으로 옮겼다 — 여기서 멈춘다
     window.scrollTo(0, 0);          // 장 이동 시 맨 위
   } else {
     syncNav();
@@ -429,7 +475,7 @@ function bindMapGestures() {
     e.preventDefault();
     const [cx, cy] = toView(e.clientX, e.clientY);
     state.view = zoomAt(state.view, cx, cy, Math.exp(-e.deltaY * 0.0022), state.render?.bounds);
-    drawMap();
+    scheduleDraw();
   }, { passive: false });
 
   svg.addEventListener('dblclick', e => {
@@ -462,7 +508,7 @@ function bindMapGestures() {
       const now = pinchState();
       state.view = zoomAt(state.view, now.mid[0], now.mid[1], now.d / pinch.d, state.render?.bounds);
       pinch = now;
-      drawMap();
+      scheduleDraw();
       return;
     }
     if (pts.size === 1 && last) {
@@ -473,7 +519,7 @@ function bindMapGestures() {
         py: state.view.py + (e.clientY - last.y) / k,
       }, state.render?.bounds);
       last = { x: e.clientX, y: e.clientY };
-      drawMap();
+      scheduleDraw();
     }
   });
   const up = e => {
@@ -1064,6 +1110,11 @@ function fbSync() {
   const empty = !$('fb-text').value.trim();
   $('fb-send').disabled = empty || fb.sending || blocked;
   $('fb-send').textContent = fb.sending ? '보내는 중…' : '보내기';
+  // 보내는 동안은 내용·이름·위치를 잠근다 (F9). 응답을 기다리는 사이에 쓴 글이
+  // 남의 성공 응답에 지워지는 일을 애초에 만들지 않는다. 취소·닫기는 그대로 열려 있다.
+  $('fb-text').disabled = fb.sending;
+  $('fb-name').disabled = fb.sending;
+  $('fb-loc-x').disabled = fb.sending;
 }
 
 // 5줄로 시작해 12줄까지만 자란다.
@@ -1150,11 +1201,13 @@ async function fbSend() {
   if (!text) return;
   const name = $('fb-name').value.trim();
   ls.set('fbName', name);
+  const sent = $('fb-text').value;              // 보낸 글 그대로. 성공 후 비울지 이걸로 가린다
+  const hadFocus = document.activeElement === $('fb-text');
 
   fb.sending = true;
   fbMsg('');
   $('fb-copy').hidden = true;
-  fbSync();
+  fbSync();                                     // 여기서 내용·이름·위치가 잠긴다
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), FB_TIMEOUT);
@@ -1174,7 +1227,9 @@ async function fbSend() {
     let data = null;
     try { data = await r.json(); } catch { /* 본문이 JSON 이 아닐 수도 있다 */ }
     if (r.ok && data && data.ok === true) {
-      $('fb-text').value = '';                 // 이름은 남기고 내용만 비운다
+      // 이름은 남기고 내용만 비운다 — 단, 지금 칸에 든 것이 **보낸 그 글일 때만**.
+      // 잠금(F9)이 이미 막고 있지만, 잠금을 빠져나간 경로가 있어도 글이 사라지지 않게 한 겹 더 둔다.
+      if ($('fb-text').value === sent) $('fb-text').value = '';
       fbGrow();
       fbMsg('고맙습니다. 잘 받았습니다.');
       fb.thanksTimer = setTimeout(() => closeFb(), FB_THANKS);
@@ -1186,7 +1241,9 @@ async function fbSend() {
   } finally {
     clearTimeout(timer);
     fb.sending = false;
-    fbSync();
+    fbSync();                                   // 잠금 해제
+    // 잠기는 순간 포커스가 body 로 밀려난다. 카드가 아직 열려 있으면 제자리로 돌려놓는다.
+    if (hadFocus && fb.open && document.activeElement !== $('fb-text')) $('fb-text').focus();
   }
 }
 
@@ -1208,6 +1265,65 @@ function bindFeedback() {
     if ($('fb-card').contains(e.target) || $('btn-fb').contains(e.target)) return;
     closeFb(false);
   });
+}
+
+// --- 출처 표기 (F11) ---
+// CC BY 4.0 은 출처 이름만으로는 모자란다 — 원본 링크 · 라이선스 링크 · 변경 고지가 있어야 한다.
+// attribution.json 두 형식을 다 받는다:
+//   새 형식 { sources: [{ text, author, url, license, license_url, changes }], legacy: ["…"] }
+//     — 06-a 가 쓰는 키는 `sources` 다. `items` 도 같은 뜻으로 받아 준다.
+//   옛 형식 ["…", "…"]  (배포본·픽스처가 아직 옛 것일 수 있다)
+function attrItems(data) {
+  if (Array.isArray(data)) return data.map(text => ({ text }));
+  const objs = data?.sources ?? data?.items;
+  if (Array.isArray(objs)) return objs;
+  if (Array.isArray(data?.legacy)) return data.legacy.map(text => ({ text }));
+  return [];
+}
+
+// 새 탭으로 여는 링크. rel="noopener" 는 원본 탭을 넘겨주지 않기 위해서다.
+function extLink(href, text) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = text;
+  return a;
+}
+
+// 출처 하나 = `이름 (저작자, 라이선스) — 변경: …`.
+// 이름과 라이선스는 링크가 있으면 링크로. 저작자가 이름에 이미 들어 있으면 두 번 쓰지 않는다
+// (`OpenBible.info Bible Geocoding` 의 저작자는 `OpenBible.info`). TIPNR 의
+// `Tyndale House, Cambridge` 처럼 이름에 없는 저작자는 반드시 남긴다.
+function attrNode(it) {
+  const s = document.createElement('span');
+  s.className = 'attr-item';
+  const txt = t => document.createTextNode(t);
+  s.append(it.url ? extLink(it.url, it.text) : txt(it.text));
+  const showAuthor = it.author && !String(it.text || '').includes(it.author);
+  if (showAuthor || it.license) {
+    s.append(txt(' ('));
+    if (showAuthor) s.append(txt(it.author));
+    if (showAuthor && it.license) s.append(txt(', '));
+    if (it.license) {
+      s.append(it.license_url ? extLink(it.license_url, it.license) : txt(it.license));
+    }
+    s.append(txt(')'));
+  }
+  if (it.changes) s.append(txt(' — 변경: ' + it.changes));
+  return s;
+}
+
+// 푸터는 링크가 붙은 긴 형태 한 줄(옅은 글씨, 넘치면 줄바꿈).
+// 패널은 자리가 좁으니 예전처럼 이름만 짧게 — 링크는 푸터 한 곳에만 둔다.
+function renderAttr(items) {
+  const foot = $('attr-line');
+  foot.textContent = '';
+  items.forEach((it, i) => {
+    if (i) foot.append(document.createTextNode(' · '));
+    foot.append(attrNode(it));
+  });
+  $('panel-attr').textContent = items.map(it => it.text).join(' · ');
 }
 
 // --- 부팅 ---
@@ -1249,9 +1365,7 @@ async function boot() {
   } catch {
     state.eras = null; state.chapterEras = null; state.regionsByEra = null;
   }
-  const attrLine = (state.attr || []).join(' · ');
-  $('attr-line').textContent = attrLine;
-  $('panel-attr').textContent = attrLine;
+  renderAttr(attrItems(state.attr));
 
   bindPicker();
   bindFeedback();
@@ -1290,10 +1404,9 @@ async function boot() {
   window.addEventListener('resize', () => { setPanelW(storedW()); scheduleRelayout(); });
 
   if (!location.hash) {
-    const last = ls.get('last');
-    const m = last && /^(\w+)\.(\d+)$/.exec(last);
-    const b = m && bookOf(m[1]);
-    location.hash = b ? `#${m[1]}.${m[2]}` : '#Gen.1';
+    // 저장된 last 도 해시와 같은 검증을 통과해야 쓴다 (F10). 손상됐으면 창 1.
+    const f = lastValidRef();
+    location.hash = `#${f.book}.${f.ch}`;
   }
   // 패널 폭도 기억한다. 저장된 값이 없으면 400px.
   setPanelW(storedW());
@@ -1311,6 +1424,10 @@ async function boot() {
     parseQuery, matchBook, koPrefix, choOf, scrollToVerse, verseCount,
     // 피드백 (Spike 05-b)
     fb, openFb, closeFb, fbLocText, fbVerse, fbDevice, fbCopyText, fbSetLoc, FEEDBACK_URL,
+    fbSend, fbSync,
+    // 06-b (리뷰 반영): 순수 네비게이션·해시 검증·출처
+    stepRef, isValidRef, step, lastValidRef, parseHash,
+    attrItems, renderAttr, scheduleDraw,
   };
   await apply();
 }
