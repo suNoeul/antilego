@@ -8,7 +8,7 @@
 | | 무엇 | 어디 | 누가 |
 |---|---|---|---|
 | **05-a** | 받아서 Notion 에 쓰는 함수 | `api/` | 이 문서 |
-| 05-b | "피드백" 버튼과 폼 | `web/` | 다른 에이전트 |
+| **05-b** | "피드백" 알약과 카드 | `web/` | [`RESULT.md`](RESULT.md) 의 `05-b · UI` |
 
 ## 왜 서버가 필요한가
 
@@ -30,3 +30,8 @@ cd api
 node test/notion-mock.mjs          # 24개 검사, 네트워크 안 씀
 MOCK_NOTION=1 node test/local.mjs  # :3300 에 띄우고 Notion 으로 보낼 본문을 찍는다
 ```
+
+UI 쪽(05-b)은 `cd web && python3 -m http.server 8000` 으로 열고 오른쪽 `피드백` 알약을 누른다.
+보내는 곳은 `web/app.js` 의 `FEEDBACK_URL` 한 줄이다:
+`https://antilego-api.vercel.app/api/feedback`. 로컬 함수로 바꿔 보려면
+`http://localhost:3300/api/feedback` 으로 고치면 된다 (CORS 가 localhost 를 통과시킨다).

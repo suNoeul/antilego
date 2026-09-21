@@ -67,12 +67,20 @@
   </article>
 </main>
 
-<footer class="attr"><p id="attr-line"></p></footer>
+<footer class="attr">
+  <p id="attr-line"></p>
+  <p class="attr-fb">읽다가 이상하면 오른쪽 '피드백' 버튼을 눌러 주세요.</p>
+</footer>
 
 <!-- 지도 패널 하나. 기본 닫힘. -->
 <div id="scrim" class="scrim"></div>
 
-<button id="btn-map" class="fab" type="button" aria-expanded="false" aria-controls="panel">지도</button>
+<!-- 플로팅 알약 둘. 데스크톱은 오른쪽 가장자리에 세로로(지도 위 · 피드백 아래),
+     모바일은 오른쪽 아래에 가로로(피드백 왼쪽 · 지도 오른쪽). 패널이 열리면 같이 옮겨 붙는다. -->
+<div class="fabs">
+  <button id="btn-map" class="fab" type="button" aria-expanded="false" aria-controls="panel">지도</button>
+  <button id="btn-fb" class="fab fab-2" type="button" aria-expanded="false" aria-controls="fb-card">피드백</button>
+</div>
 
 <!-- 패널 왼쪽 가장자리. 끌면 지도가 넓어진다. ≥1200px(밀어내기 모드)에서만 나타난다. -->
 <div id="resizer" class="resizer" role="separator" aria-orientation="vertical"
@@ -99,6 +107,41 @@
     <p id="panel-attr" class="panel-attr"></p>
   </div>
 </aside>
+
+<!-- 피드백 (Spike 05-b). 데스크톱 ≥900px 은 버튼 옆 360px 팝오버, 그 아래는 전체 폭 바닥 시트.
+     z-index 70 — 피커(60) · 플로팅 버튼(45) · 지도 패널(40) 위에 앉는다. -->
+<div id="fb-card" class="fb-card" role="dialog" aria-label="피드백 보내기" hidden>
+  <div class="fb-head">
+    <h2 class="fb-title">피드백</h2>
+    <span class="grow"></span>
+    <button id="fb-x" class="fb-x" type="button" aria-label="닫기">×</button>
+  </div>
+
+  <p id="fb-loc" class="fb-loc">
+    <span class="fb-loc-k">위치:</span>
+    <span id="fb-loc-t" class="fb-loc-t"></span>
+    <button id="fb-loc-x" class="fb-loc-x" type="button" aria-label="위치 빼기">×</button>
+  </p>
+
+  <input id="fb-name" class="fb-in" type="text" maxlength="40" autocomplete="off"
+         aria-label="이름" placeholder="이름 (선택)">
+  <textarea id="fb-text" class="fb-in fb-text" maxlength="2000" rows="5"
+            aria-label="내용"
+            placeholder="읽다가 느낀 점, 이상한 지명, 지도에서 헷갈린 것…"></textarea>
+
+  <!-- 허니팟. 사람 눈에 안 보이는 칸이다 — 채워져 오면 봇으로 본다. -->
+  <input id="fb-hp" class="fb-hp" type="text" tabindex="-1" autocomplete="off"
+         aria-hidden="true">
+
+  <p id="fb-msg" class="fb-msg" role="status" hidden></p>
+
+  <div class="fb-row">
+    <button id="fb-copy" class="fb-btn" type="button" hidden>복사해서 보내기</button>
+    <span class="grow"></span>
+    <button id="fb-cancel" class="fb-btn" type="button">취소</button>
+    <button id="fb-send" class="fb-btn fb-primary" type="button" disabled>보내기</button>
+  </div>
+</div>
 
 <script type="module" src="app.js?v=__V__"></script>
 </body>

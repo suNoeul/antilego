@@ -992,6 +992,224 @@ function bindPicker() {
   });
 }
 
+/* ==========================================================================
+   피드백 (Spike 05-b) — 알약 하나 + 카드 하나
+   읽던 자리를 **따로 한 줄**로 채워 두고(지우고 싶으면 `×`), 내용은 빈 칸으로 시작한다.
+   보낸 글은 Vercel 함수(api/)를 거쳐 Notion 📮 Feedback DB 로 간다.
+   실패하면 글을 지우지 않고 `복사해서 보내기` 를 내민다 — 카톡으로라도 닿게.
+   ========================================================================== */
+
+const FEEDBACK_URL = 'https://antilego-api.vercel.app/api/feedback';
+const FB_TIMEOUT = 8000;      // fetch 제한 시간
+const FB_THANKS = 2000;       // 고맙습니다 → 닫힘
+const FB_COOL = 60000;        // 429 뒤 보내기 잠금
+
+const fb = {
+  open: false,
+  loc: '',                    // 보낼 위치 문자열. `×` 로 빼면 ''
+  sending: false,
+  blockUntil: 0,              // 429 잠금이 풀리는 시각
+  thanksTimer: 0,
+  blockTimer: 0,
+};
+
+// 폰 <600 · 태블릿 <1024 · 데스크톱. 함수가 아는 이름은 이 셋뿐이다(그 밖은 '모름').
+function fbDevice() {
+  if (window.matchMedia('(max-width: 599px)').matches) return '폰';
+  if (window.matchMedia('(max-width: 1023px)').matches) return '태블릿';
+  return '데스크톱';
+}
+
+// 지금 화면에 보이는 첫 절. 상단바 아래에서부터 재고, 절 하나가 화면보다 길면
+// 화면 위로 지나간 마지막 절을 쓴다. 본문을 못 받았으면 null.
+function fbVerse() {
+  const top = document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0;
+  const h = window.innerHeight;
+  let last = null;
+  for (const el of document.querySelectorAll('.verse')) {
+    const t = el.getBoundingClientRect().top;
+    if (t >= top && t <= h) return +el.dataset.v;
+    if (t < top) last = +el.dataset.v;
+  }
+  return last;
+}
+
+// `사사기 9장 21절 · 브엘` — 장은 언제나, 절은 보일 때, 지명은 골랐을 때.
+function fbLocText() {
+  const b = bookOf(state.book);
+  let s = (b ? b.ko : state.book) + ' ' + state.ch + '장';
+  const v = fbVerse();
+  if (v) s += ' ' + v + '절';
+  const p = state.sel && state.places[state.sel];
+  if (p && p.ko) s += ' · ' + p.ko;
+  return s;
+}
+
+function fbSetLoc(text) {
+  fb.loc = text || '';
+  $('fb-loc-t').textContent = fb.loc;
+  $('fb-loc').hidden = !fb.loc;
+}
+
+function fbMsg(text, bad = false) {
+  const el = $('fb-msg');
+  el.textContent = text || '';
+  el.classList.toggle('fb-bad', !!bad && !!text);
+  el.hidden = !text;
+}
+
+// 보내기가 눌리는 조건: 내용이 있고, 보내는 중이 아니고, 429 잠금이 풀려 있을 것.
+function fbSync() {
+  const blocked = Date.now() < fb.blockUntil;
+  const empty = !$('fb-text').value.trim();
+  $('fb-send').disabled = empty || fb.sending || blocked;
+  $('fb-send').textContent = fb.sending ? '보내는 중…' : '보내기';
+}
+
+// 5줄로 시작해 12줄까지만 자란다.
+function fbGrow() {
+  const t = $('fb-text');
+  const cs = getComputedStyle(t);
+  const lh = parseFloat(cs.lineHeight) || 22;
+  const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+    + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+  t.style.height = 'auto';
+  const rows = Math.max(5, Math.min(12, Math.round((t.scrollHeight - pad) / lh)));
+  t.style.height = (rows * lh + pad) + 'px';
+}
+
+function openFb() {
+  if (fb.open) return;
+  fb.open = true;
+  clearTimeout(fb.thanksTimer);
+  $('fb-card').hidden = false;
+  $('btn-fb').setAttribute('aria-expanded', 'true');
+  $('fb-name').value = ls.get('fbName') || '';
+  $('fb-hp').value = '';
+  fbSetLoc(fbLocText());
+  fbMsg('');
+  $('fb-copy').hidden = true;
+  fbGrow();
+  fbSync();
+  if (window.innerWidth >= 900) $('fb-text').focus();
+}
+
+// 바깥을 눌러 닫을 때는 포커스를 되돌리지 않는다 — 누른 자리에 그대로 두는 게 맞다.
+function closeFb(refocus = true) {
+  if (!fb.open) return;
+  fb.open = false;
+  clearTimeout(fb.thanksTimer);
+  $('fb-card').hidden = true;
+  $('btn-fb').setAttribute('aria-expanded', 'false');
+  if (refocus) $('btn-fb').focus();
+}
+const toggleFb = () => (fb.open ? closeFb() : openFb());
+
+// 보내지 못했을 때 내미는 글. 카톡·메일 어디에 붙여도 그대로 읽힌다.
+function fbCopyText() {
+  const name = $('fb-name').value.trim() || '익명';
+  return `[Antilego 피드백] 위치: ${fb.loc || '(없음)'} / 이름: ${name} / 내용: ${$('fb-text').value.trim()}`;
+}
+
+async function fbCopy() {
+  const text = fbCopyText();
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch {
+    // 권한이 없거나 옛 브라우저면 숨은 textarea 로 물러선다.
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+      document.body.append(ta);
+      ta.select();
+      ok = document.execCommand('copy');
+      ta.remove();
+    } catch { ok = false; }
+  }
+  fbMsg(ok ? '복사됨 — 카톡 등으로 보내 주세요' : '복사하지 못했습니다. 글을 직접 긁어 주세요.', !ok);
+}
+
+function fbFail(error, cool = false) {
+  fbMsg(error || '보내지 못했습니다.', true);   // 글은 그대로 둔다
+  $('fb-copy').hidden = false;
+  if (cool) {
+    fb.blockUntil = Date.now() + FB_COOL;
+    clearTimeout(fb.blockTimer);
+    fb.blockTimer = setTimeout(() => { fb.blockUntil = 0; fbSync(); }, FB_COOL);
+  }
+  fbSync();
+}
+
+async function fbSend() {
+  if (fb.sending || Date.now() < fb.blockUntil) return;
+  const text = $('fb-text').value.trim();
+  if (!text) return;
+  const name = $('fb-name').value.trim();
+  ls.set('fbName', name);
+
+  fb.sending = true;
+  fbMsg('');
+  $('fb-copy').hidden = true;
+  fbSync();
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), FB_TIMEOUT);
+  try {
+    const r = await fetch(FEEDBACK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, text, loc: fb.loc,
+        url: location.href,
+        device: fbDevice(),
+        hp: $('fb-hp').value,
+        ts: new Date().toISOString(),
+      }),
+      signal: ac.signal,
+    });
+    let data = null;
+    try { data = await r.json(); } catch { /* 본문이 JSON 이 아닐 수도 있다 */ }
+    if (r.ok && data && data.ok === true) {
+      $('fb-text').value = '';                 // 이름은 남기고 내용만 비운다
+      fbGrow();
+      fbMsg('고맙습니다. 잘 받았습니다.');
+      fb.thanksTimer = setTimeout(() => closeFb(), FB_THANKS);
+    } else {
+      fbFail(data?.error, r.status === 429);
+    }
+  } catch {
+    fbFail('보내지 못했습니다.');               // 네트워크 실패·시간 초과
+  } finally {
+    clearTimeout(timer);
+    fb.sending = false;
+    fbSync();
+  }
+}
+
+function bindFeedback() {
+  $('btn-fb').addEventListener('click', toggleFb);
+  $('fb-x').addEventListener('click', () => closeFb());
+  $('fb-cancel').addEventListener('click', () => closeFb());
+  $('fb-loc-x').addEventListener('click', () => fbSetLoc(''));
+  $('fb-send').addEventListener('click', fbSend);
+  $('fb-copy').addEventListener('click', fbCopy);
+  $('fb-text').addEventListener('input', () => { fbGrow(); fbSync(); });
+  $('fb-name').addEventListener('input', () => ls.set('fbName', $('fb-name').value.trim()));
+  $('fb-card').addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFb(); }
+  });
+  // 바깥 누르면 닫힘 — 데스크톱 팝오버만. 모바일 시트는 아래에 붙어 있어 오발이 잦다.
+  document.addEventListener('mousedown', e => {
+    if (!fb.open || window.innerWidth < 900) return;
+    if ($('fb-card').contains(e.target) || $('btn-fb').contains(e.target)) return;
+    closeFb(false);
+  });
+}
+
 // --- 부팅 ---
 async function boot() {
   setTheme(ls.get('theme')
@@ -1036,6 +1254,7 @@ async function boot() {
   $('panel-attr').textContent = attrLine;
 
   bindPicker();
+  bindFeedback();
   $('btn-prev').addEventListener('click', () => step(-1));
   $('btn-next').addEventListener('click', () => step(1));
 
@@ -1054,6 +1273,10 @@ async function boot() {
     if (!state.open) setPanel(true);            // 지명을 누르면 패널이 열린다
   });
   document.addEventListener('keydown', e => {
+    if (fb.open) {                               // 피드백 카드가 제일 위(70)다 — Esc 를 먼저 받는다
+      if (e.key === 'Escape') { e.preventDefault(); closeFb(); }
+      return;
+    }
     if (pick.open) return;                       // 피커가 열려 있으면 피커가 먼저 받는다
     if (e.key === 'Escape' && state.open) { setPanel(false); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1086,6 +1309,8 @@ async function boot() {
     // 성경 찾기 (Spike 04)
     pick, openPicker, closePicker, renderPicker, rebuildList,
     parseQuery, matchBook, koPrefix, choOf, scrollToVerse, verseCount,
+    // 피드백 (Spike 05-b)
+    fb, openFb, closeFb, fbLocText, fbVerse, fbDevice, fbCopyText, fbSetLoc, FEEDBACK_URL,
   };
   await apply();
 }
