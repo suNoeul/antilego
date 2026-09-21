@@ -14,14 +14,51 @@
 
 <header class="topbar">
   <nav class="topbar-in">
-    <select id="sel-book" aria-label="권"></select>
-    <select id="sel-chapter" aria-label="장"></select>
+    <button id="loc" class="loc" type="button" aria-haspopup="dialog"
+            aria-expanded="false" aria-controls="picker">
+      <span id="loc-text"></span><span class="loc-chev" aria-hidden="true">▸</span>
+    </button>
     <button id="btn-prev" class="ghost" type="button" aria-label="이전 장">‹</button>
     <button id="btn-next" class="ghost" type="button" aria-label="다음 장">›</button>
     <span class="grow"></span>
     <button id="btn-theme" class="ghost" type="button" aria-label="다크 모드" aria-pressed="false">☾</button>
   </nav>
 </header>
+
+
+<!-- 성경 찾기 (Spike 04). 데스크톱 ≥900px 은 상단바 아래 팝오버, 그 아래는 전체 화면 시트.
+     기본 닫힘. `#loc` · `/` · `g` 로 연다. -->
+<div id="picker" class="picker" role="dialog" aria-modal="true" aria-label="성경 찾기"
+     data-step="1" hidden>
+  <div class="pick-head">
+    <button id="pick-back" class="pick-back" type="button" hidden>← 뒤로</button>
+    <span id="pick-crumb" class="pick-crumb"></span>
+    <span class="grow"></span>
+    <button id="pick-x" class="pick-x" type="button" aria-label="닫기">×</button>
+  </div>
+  <div class="pick-qrow">
+    <input id="pick-q" class="pick-q" type="text" autocomplete="off" autocapitalize="off"
+           spellcheck="false" aria-label="책 이름으로 찾기"
+           aria-controls="col-book"
+           placeholder="책 이름 · 약어 · 영문 · 예: 삿 9:3">
+  </div>
+  <div id="pick-chips" class="pick-chips" role="group" aria-label="초성"></div>
+  <div class="pick-cols">
+    <section class="pick-colwrap" data-col="1">
+      <h2 class="pick-colhead">성경권</h2>
+      <div id="col-book" class="pick-col pick-books" role="listbox"
+           aria-label="성경권"></div>
+    </section>
+    <section class="pick-colwrap" data-col="2">
+      <h2 class="pick-colhead">장<span id="head-ch" class="colhead-sub"></span></h2>
+      <div id="col-ch" class="pick-col pick-nums" role="listbox" aria-label="장"></div>
+    </section>
+    <section class="pick-colwrap" data-col="3">
+      <h2 class="pick-colhead">절<span id="head-v" class="colhead-sub"></span></h2>
+      <div id="col-v" class="pick-col pick-nums" role="listbox" aria-label="절"></div>
+    </section>
+  </div>
+</div>
 
 <main class="cols">
   <article class="read">

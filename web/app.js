@@ -40,6 +40,7 @@ const state = {
   // 시대 (Spike 03-d). 못 받으면 전부 null 인 채로 조용히 동작한다 — 캡션도 레이어도 없다.
   eras: null, chapterEras: null, regionsByEra: null,
   eraLayer: false,                               // 시대 영역 레이어. 기본 꺼짐
+  pendingVerse: null,                            // 성경 찾기에서 고른 절 (장 이동 후 스크롤)
 };
 
 // --- 시대 (Spike 03-d) ---
@@ -363,26 +364,8 @@ async function loadChapter() {
 }
 
 // --- 상단바 ---
-function fillBooks() {
-  const s = $('sel-book');
-  s.textContent = '';
-  for (const b of state.index.books) {
-    const o = document.createElement('option');
-    o.value = b.id; o.textContent = b.ko;
-    s.append(o);
-  }
-}
-function fillChapters() {
-  const b = bookOf(state.book);
-  const s = $('sel-chapter');
-  s.textContent = '';
-  for (let i = 1; i <= (b?.chapters || 1); i++) {
-    const o = document.createElement('option');
-    o.value = i; o.textContent = i + '장';
-    s.append(o);
-  }
-  s.value = state.ch;
-}
+// 셀렉트 두 개는 Spike 04 에서 사라졌다. 지금 위치를 글자로 보여 주는 버튼 하나뿐이고,
+// 누르면 `성경 찾기` 가 열린다.
 function step(d) {
   const books = state.index.books;
   const i = books.findIndex(b => b.id === state.book);
@@ -395,8 +378,8 @@ function step(d) {
 function syncNav() {
   const books = state.index.books;
   const i = books.findIndex(b => b.id === state.book);
-  $('sel-book').value = state.book;
-  $('sel-chapter').value = state.ch;
+  const b = books[i];
+  $('loc-text').textContent = (b ? b.ko : state.book) + ' ' + state.ch + '장';
   $('btn-prev').disabled = i < 0 || (i === 0 && state.ch <= 1);
   $('btn-next').disabled = i < 0 || (i === books.length - 1 && state.ch >= books[i].chapters);
 }
@@ -411,7 +394,6 @@ async function apply() {
   state.sel = r.sel;
 
   if (changed) {
-    fillChapters();
     syncNav();
     ls.set('last', state.book + '.' + state.ch);
     await loadChapter();
@@ -421,6 +403,13 @@ async function apply() {
   }
   if (changed || selChanged) resetView();   // 새 장면 → 확대 초기화
   applySel();
+  pickSync();
+  // 성경 찾기에서 절을 골라 장을 옮겨 온 경우, 그 장이 그려진 지금 스크롤한다.
+  if (state.pendingVerse) {
+    const v = state.pendingVerse;
+    state.pendingVerse = null;
+    requestAnimationFrame(() => scrollToVerse(v));
+  }
 }
 
 // --- 지도 조작 (휠·드래그·핀치·더블클릭) ---
@@ -558,6 +547,451 @@ function bindGrip() {
   grip.addEventListener('pointercancel', () => { y0 = null; });
 }
 
+// ===========================================================================
+// 성경 찾기 (Spike 04) — 권·장·절 하나의 UI 로. 상단바의 셀렉트 두 개를 대신한다.
+// 데스크톱(≥900px)은 상단바 아래 팝오버 3열, 그 아래는 전체 화면 시트 3단계.
+// 해시 문법(#Book.ch/<placeId>)은 건드리지 않는다 — 절로 가는 것은 스크롤 + 2초 표시다.
+// ===========================================================================
+
+const PICK_WIDE = () => window.innerWidth >= 900;
+
+// --- 한글 초성 ---
+// 완성형 음절 U+AC00 + (초성 × 588) + (중성 × 28) + 종성.
+const CHO = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ',
+  'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+const DOUBLE = { 'ㄲ': 'ㄱ', 'ㄸ': 'ㄷ', 'ㅃ': 'ㅂ', 'ㅆ': 'ㅅ', 'ㅉ': 'ㅈ' };
+// 모바일 초성 칩 줄. 쌍자음은 넣지 않는다 (권 이름에 쓰이지 않는다).
+const CHIPS = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
+const isSyllable = c => c >= 0xac00 && c <= 0xd7a3;
+// 낱자 자음(호환 자모 ㄱ..ㅎ)이면 쌍자음을 홑자음으로 접어서 돌려준다. 아니면 null.
+function jamo(ch) {
+  const c = ch.charCodeAt(0);
+  if (c < 0x3131 || c > 0x314e) return null;
+  return DOUBLE[ch] || ch;
+}
+// 음절의 초성(쌍자음은 접는다). 음절이 아니면 null.
+function choOf(ch) {
+  const c = ch.charCodeAt(0);
+  if (!isSyllable(c)) return null;
+  const j = CHO[Math.floor((c - 0xac00) / 588)];
+  return DOUBLE[j] || j;
+}
+
+// 질의가 대상의 **앞부분**과 맞는가. 질의의 한 글자가
+//   낱자 자음이면 → 그 자리 글자의 초성과 비교 (`ㅅㅅ` → 사사기)
+//   완성 음절이면 → 그 글자 그대로 비교 (`사` → 사사기·사도행전)
+function koPrefix(q, target) {
+  const a = [...q], b = [...target];
+  if (!a.length || a.length > b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const j = jamo(a[i]);
+    if (j) { if (choOf(b[i]) !== j) return false; }
+    else if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+// 초성만으로 된 질의 (모바일 칩이 쓰는 길)
+const choPrefix = (q, target) => koPrefix(q, target);
+
+const enKey = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const HAS_KO = /[ㄱ-ㆎ가-힣]/;
+
+// 한 권이 질의와 맞는가. 한글이면 약어·한글 이름 둘 다, 아니면 영문 이름·OSIS id.
+function matchBook(b, text) {
+  if (!text) return true;
+  if (HAS_KO.test(text)) return koPrefix(text, b.abbr) || koPrefix(text, b.ko);
+  const k = enKey(text);
+  return !!k && (enKey(b.en).startsWith(k) || b.id.toLowerCase().startsWith(text.toLowerCase()));
+}
+
+// `삿 9:3` · `9 3` · `9.3` · `9` · `gen` · `1co` 를 {text, ch, v} 로 가른다.
+// 끝에 붙은 숫자만 장·절로 본다 — `1co` 의 `1` 은 글자 쪽에 남는다.
+function parseQuery(raw) {
+  const s = (raw || '').trim();
+  let m = /^(.*?)\s*(\d+)\s*(?::|\.|\s)\s*(\d+)$/.exec(s);
+  if (m) return { text: m[1].trim(), ch: +m[2], v: +m[3] };
+  m = /^(.*?)\s*(\d+)$/.exec(s);
+  if (m) return { text: m[1].trim(), ch: +m[2], v: null };
+  return { text: s, ch: null, v: null };
+}
+
+const pick = {
+  open: false,
+  book: null,      // 장 열이 보여 주는 권 (선택)
+  ch: null,        // 절 열이 보여 주는 장 (선택)
+  v: null,         // 질의가 가리키는 절
+  nv: 0,           // pick.ch 의 절 수 (0 = 아직 모름)
+  cho: null,       // 모바일 초성 칩
+  step: 1,         // 모바일 단계 1=권 2=장 3=절
+  list: [],        // 필터된 권 목록
+  hi: -1,          // 키보드 커서 (pick.list 의 인덱스)
+  q: { text: '', ch: null, v: null },
+};
+
+// 장별 절 수 캐시. 지금 읽는 장은 이미 받아 둔 state.data 를 그대로 쓴다.
+const vcount = new Map();
+async function verseCount(book, ch) {
+  if (!book || !ch) return 0;
+  const key = book + '/' + ch;
+  if (vcount.has(key)) return vcount.get(key);
+  if (state.book === book && state.ch === ch && state.data) {
+    const n = state.data.verses.length;
+    vcount.set(key, n);
+    return n;
+  }
+  try {
+    const d = await getJSON(`books/${book}/${ch}.json`);
+    const n = (d.verses || []).length;
+    vcount.set(key, n);
+    return n;
+  } catch { return 0; }
+}
+
+// --- 절로 가기. 해시는 그대로 두고 스크롤 + 2초 표시. ---
+let hlTimer = 0;
+function scrollToVerse(n) {
+  const el = document.querySelector(`.verse[data-v="${n}"]`);
+  if (!el) return false;
+  el.scrollIntoView({ block: 'center' });
+  clearTimeout(hlTimer);
+  for (const o of document.querySelectorAll('.verse-hl')) o.classList.remove('verse-hl');
+  el.classList.add('verse-hl');
+  hlTimer = setTimeout(() => el.classList.remove('verse-hl'), 2000);
+  return true;
+}
+// 다른 장이면 먼저 옮기고, 그 장이 그려진 뒤에 스크롤한다 (apply() 가 마무리한다).
+function navVerse(book, ch, v) {
+  if (state.book === book && state.ch === ch) { scrollToVerse(v); return; }
+  state.pendingVerse = v;
+  go(book, ch, null);
+}
+
+// --- 그리기 ---
+function rebuildList() {
+  let list = state.index?.books || [];
+  if (pick.cho) list = list.filter(b => choPrefix(pick.cho, b.abbr) || choPrefix(pick.cho, b.ko));
+  if (pick.q.text) list = list.filter(b => matchBook(b, pick.q.text));
+  pick.list = list;
+  const i = list.findIndex(b => b.id === pick.book);
+  pick.hi = i >= 0 ? i : (list.length ? 0 : -1);
+}
+
+function renderBooks() {
+  const col = $('col-book');
+  col.textContent = '';
+  if (!pick.list.length) {
+    const p = document.createElement('p');
+    p.className = 'pick-empty';
+    p.textContent = '일치하는 책이 없습니다';
+    col.append(p);
+    return;
+  }
+  let grp = null;
+  // `group` 이 없는 데이터(픽스처)에서도 무너지지 않게 구약/신약으로 물러선다.
+  const groupOf = b => b.group || (b.testament === 'OT' ? '구약' : '신약');
+  pick.list.forEach((b, i) => {
+    if (groupOf(b) !== grp) {
+      grp = groupOf(b);
+      const h = document.createElement('div');
+      h.className = 'grp';
+      h.textContent = grp;
+      col.append(h);
+    }
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'bk' + (b.id === state.book ? ' cur' : '') + (i === pick.hi ? ' hi' : '');
+    row.dataset.id = b.id;
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', String(b.id === pick.book));
+    row.tabIndex = i === pick.hi ? 0 : -1;
+    const chip = document.createElement('span');
+    chip.className = 'chip ' + (b.testament === 'OT' ? 'chip-ot' : 'chip-nt');
+    chip.textContent = b.abbr;
+    const ko = document.createElement('span');
+    ko.className = 'bk-ko';
+    ko.textContent = b.ko;
+    const en = document.createElement('span');
+    en.className = 'bk-en';
+    en.textContent = b.en || '';
+    row.append(chip, ko, en);
+    col.append(row);
+  });
+  const sel = col.querySelector('.bk.hi') || col.querySelector('.bk[aria-selected="true"]');
+  sel?.scrollIntoView({ block: 'nearest' });
+}
+
+function numGrid(col, n, cur, hint) {
+  col.textContent = '';
+  if (!n) {
+    const p = document.createElement('p');
+    p.className = 'pick-hint';
+    p.textContent = hint;
+    col.append(p);
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  for (let i = 1; i <= n; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'num';
+    b.dataset.n = i;
+    b.setAttribute('role', 'option');
+    b.setAttribute('aria-selected', String(i === cur));
+    b.tabIndex = i === (cur || 1) ? 0 : -1;
+    b.textContent = i;
+    frag.append(b);
+  }
+  col.append(frag);
+  col.querySelector('.num[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+}
+
+function renderChapters() {
+  const b = pick.book && bookOf(pick.book);
+  $('head-ch').textContent = b ? b.ko : '';
+  numGrid($('col-ch'), b ? b.chapters : 0, pick.ch, '책을 고르세요');
+}
+function renderVerses() {
+  const b = pick.book && bookOf(pick.book);
+  $('head-v').textContent = b && pick.ch ? b.ko + ' ' + pick.ch + '장' : '';
+  numGrid($('col-v'), pick.book && pick.ch ? pick.nv : 0, pick.v, '장을 고르세요');
+}
+
+function renderChips() {
+  const box = $('pick-chips');
+  box.textContent = '';
+  for (const c of CHIPS) {
+    const on = pick.cho === c;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'kchip';
+    b.dataset.cho = c;
+    b.setAttribute('aria-pressed', String(on));
+    b.append(document.createTextNode(c));
+    if (on) {
+      const x = document.createElement('span');
+      x.className = 'kchip-x';
+      x.textContent = '×';
+      b.append(x);
+    }
+    box.append(b);
+  }
+}
+
+function renderCrumb() {
+  const b = pick.book && bookOf(pick.book);
+  const parts = [];
+  if (b) parts.push(b.ko);
+  if (b && pick.ch) parts.push(pick.ch + '장');
+  $('pick-crumb').textContent = parts.join(' › ') || '성경 찾기';
+  $('pick-back').hidden = pick.step <= 1;
+  $('picker').dataset.step = String(pick.step);
+}
+
+function renderPicker() {
+  renderBooks();
+  renderChapters();
+  renderVerses();
+  renderCrumb();
+}
+
+// pick.ch 의 절 수를 받아 절 열만 다시 그린다 (경쟁 조건 방지용 토큰).
+let vseq = 0;
+async function refreshVerses() {
+  const my = ++vseq;
+  const n = await verseCount(pick.book, pick.ch);
+  if (my !== vseq) return;
+  pick.nv = n;
+  if (pick.v && pick.v > n) pick.v = null;
+  if (pick.open) renderVerses();
+}
+
+// --- 고르기 ---
+function setBook(id, { step = false } = {}) {
+  pick.book = id;
+  const i = pick.list.findIndex(b => b.id === id);
+  if (i >= 0) pick.hi = i;
+  pick.ch = id === state.book ? state.ch : null;
+  pick.v = null;
+  pick.nv = 0;
+  if (step && !PICK_WIDE()) pick.step = 2;
+  renderPicker();
+  if (pick.ch) refreshVerses();
+}
+
+function chooseChapter(n) {
+  if (!pick.book) return;
+  pick.ch = n;
+  pick.v = null;
+  pick.nv = 0;
+  if (!PICK_WIDE()) pick.step = 3;
+  go(pick.book, n, null);          // 바로 옮긴다. 피커는 열린 채로 둔다
+  renderPicker();
+  refreshVerses();
+}
+
+function chooseVerse(n) {
+  if (!pick.book || !pick.ch) return;
+  pick.v = n;
+  navVerse(pick.book, pick.ch, n);
+  closePicker();
+}
+
+// 입력줄의 Enter. 권만 → 1장 · 권+장 → 그 장 · 절까지 → 그 장 + 절로 스크롤 후 닫기.
+function applyQuery() {
+  const b = pick.list[pick.hi] || (pick.book && bookOf(pick.book));
+  if (!b) return;
+  const ch = Math.min(Math.max(1, pick.q.ch || 1), b.chapters);
+  pick.book = b.id;
+  pick.ch = ch;
+  if (pick.q.v) {
+    closePicker();
+    navVerse(b.id, ch, pick.q.v);
+    return;
+  }
+  go(b.id, ch, null);
+  if (!PICK_WIDE()) pick.step = 3;
+  renderPicker();
+  refreshVerses();
+  ($('col-ch').querySelector('.num[tabindex="0"]') || $('col-ch').querySelector('.num'))?.focus();
+}
+
+function moveHi(d) {
+  if (!pick.list.length) return;
+  pick.hi = Math.max(0, Math.min(pick.list.length - 1, (pick.hi < 0 ? 0 : pick.hi) + d));
+  renderBooks();
+  if ($('col-book').contains(document.activeElement)) {
+    $('col-book').querySelector('.bk.hi')?.focus();
+  }
+}
+
+// --- 열기 · 닫기 ---
+function openPicker() {
+  if (pick.open) return;
+  pick.open = true;
+  pick.book = state.book;
+  pick.ch = state.ch;
+  pick.v = null;
+  pick.nv = 0;
+  pick.cho = null;
+  pick.step = 1;
+  pick.q = { text: '', ch: null, v: null };
+  $('pick-q').value = '';
+  rebuildList();
+  renderChips();
+  $('picker').hidden = false;
+  $('loc').setAttribute('aria-expanded', 'true');
+  renderPicker();
+  refreshVerses();
+  if (PICK_WIDE()) $('pick-q').focus();
+}
+
+function closePicker() {
+  if (!pick.open) return;
+  pick.open = false;
+  $('picker').hidden = true;
+  $('loc').setAttribute('aria-expanded', 'false');
+  $('loc').focus();
+}
+const togglePicker = () => (pick.open ? closePicker() : openPicker());
+
+// 장이 바뀌면 `현재 권` 표시와 breadcrumb 만 따라 고친다 (열려 있을 때).
+function pickSync() {
+  if (!pick.open) return;
+  for (const r of $('col-book').querySelectorAll('.bk')) {
+    r.classList.toggle('cur', r.dataset.id === state.book);
+  }
+  renderCrumb();
+}
+
+// --- Tab 으로 열을 돈다: 입력 → 성경권 → 장 → 절 → × → 입력 ---
+function tabTargets() {
+  const first = el => el.querySelector('[tabindex="0"]') || el.querySelector('button');
+  return [$('pick-q'), first($('col-book')), first($('col-ch')), first($('col-v')), $('pick-x')]
+    .filter(Boolean);
+}
+function cycleTab(back) {
+  const t = tabTargets();
+  const cur = t.findIndex(el => el === document.activeElement || el.contains?.(document.activeElement));
+  const i = cur < 0 ? 0 : (cur + (back ? -1 : 1) + t.length) % t.length;
+  t[i].focus();
+}
+
+function bindPicker() {
+  const q = $('pick-q');
+
+  $('loc').addEventListener('click', togglePicker);
+  $('pick-x').addEventListener('click', closePicker);
+  $('pick-back').addEventListener('click', () => {
+    pick.step = Math.max(1, pick.step - 1);
+    renderCrumb();
+  });
+
+  q.addEventListener('input', () => {
+    pick.q = parseQuery(q.value);
+    rebuildList();
+    if (pick.list.length === 1 && pick.list[0].id !== pick.book) {
+      // 정확히 한 권으로 좁혀지면 그 권을 골라 둔다 (옮기지는 않는다)
+      pick.book = pick.list[0].id;
+      pick.ch = null;
+      pick.nv = 0;
+    }
+    const b = pick.book && bookOf(pick.book);
+    if (b && pick.q.ch) {
+      pick.ch = Math.min(pick.q.ch, b.chapters);
+      pick.v = pick.q.v || null;
+      renderPicker();
+      refreshVerses();
+      return;
+    }
+    if (!pick.q.ch) pick.v = null;
+    renderPicker();
+    if (pick.book && pick.ch) refreshVerses();
+  });
+
+  $('picker').addEventListener('click', e => {
+    const bk = e.target.closest?.('.bk');
+    if (bk) { setBook(bk.dataset.id, { step: true }); return; }
+    const num = e.target.closest?.('.num');
+    if (num) {
+      const n = +num.dataset.n;
+      if ($('col-ch').contains(num)) chooseChapter(n);
+      else chooseVerse(n);
+      return;
+    }
+    const chip = e.target.closest?.('.kchip');
+    if (chip) {
+      pick.cho = pick.cho === chip.dataset.cho ? null : chip.dataset.cho;
+      rebuildList();
+      renderChips();
+      renderPicker();
+    }
+  });
+
+  $('picker').addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePicker(); return; }
+    if (e.key === 'Tab') { e.preventDefault(); cycleTab(e.shiftKey); return; }
+    const inList = e.target === q || $('col-book').contains(e.target);
+    if (inList && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      moveHi(e.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+    if (e.key === 'Enter' && e.target === q) { e.preventDefault(); applyQuery(); return; }
+    if (e.key === 'Enter' && $('col-book').contains(e.target)) {
+      e.preventDefault();
+      applyQuery();
+    }
+  });
+
+  // 바깥 누르면 닫힘 (데스크톱 팝오버). 모바일 시트는 화면을 다 덮으니 해당 없음.
+  document.addEventListener('mousedown', e => {
+    if (!pick.open) return;
+    if ($('picker').contains(e.target) || $('loc').contains(e.target)) return;
+    closePicker();
+  });
+}
+
 // --- 부팅 ---
 async function boot() {
   setTheme(ls.get('theme')
@@ -601,9 +1035,7 @@ async function boot() {
   $('attr-line').textContent = attrLine;
   $('panel-attr').textContent = attrLine;
 
-  fillBooks();
-  $('sel-book').addEventListener('change', e => go(e.target.value, 1, null));
-  $('sel-chapter').addEventListener('change', e => go(state.book, +e.target.value, null));
+  bindPicker();
   $('btn-prev').addEventListener('click', () => step(-1));
   $('btn-next').addEventListener('click', () => step(1));
 
@@ -622,7 +1054,12 @@ async function boot() {
     if (!state.open) setPanel(true);            // 지명을 누르면 패널이 열린다
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && state.open) setPanel(false);
+    if (pick.open) return;                       // 피커가 열려 있으면 피커가 먼저 받는다
+    if (e.key === 'Escape' && state.open) { setPanel(false); return; }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (e.key === '/' || e.key === 'g' || e.key === 'G') { e.preventDefault(); openPicker(); }
   });
   window.addEventListener('hashchange', apply);
   // 창이 좁아지면 패널도 따라 줄어든다(본문 640px 을 지키느라). 저장된 폭은 그대로 둔다 —
@@ -646,6 +1083,9 @@ async function boot() {
     state, drawMap, setPanel, anchor, fitFocus, renderPanel, V,
     setEraLayer, renderEra, eraOf, regionsOf,
     setPanelW, saveW, panelMax, relayout, mapSize, scene,
+    // 성경 찾기 (Spike 04)
+    pick, openPicker, closePicker, renderPicker, rebuildList,
+    parseQuery, matchBook, koPrefix, choOf, scrollToVerse, verseCount,
   };
   await apply();
 }

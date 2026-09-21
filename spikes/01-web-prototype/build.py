@@ -62,6 +62,44 @@ KO_ABBR = [
 ]
 N_OT = 39
 
+# 영문 권명 (성경 찾기 UI 의 영문 검색용). KO_NAMES 와 같은 순서.
+EN_NAMES = [
+    "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges",
+    "Ruth", "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles",
+    "2 Chronicles", "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+    "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah", "Lamentations",
+    "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah",
+    "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi",
+    "Matthew", "Mark", "Luke", "John", "Acts", "Romans", "1 Corinthians",
+    "2 Corinthians", "Galatians", "Ephesians", "Philippians", "Colossians",
+    "1 Thessalonians", "2 Thessalonians", "1 Timothy", "2 Timothy", "Titus",
+    "Philemon", "Hebrews", "James", "1 Peter", "2 Peter", "1 John", "2 John",
+    "3 John", "Jude", "Revelation",
+]
+
+# 권 분류 (성경 찾기 UI 의 섹션). (분류명, 권 수) 를 정경 순서대로 늘어놓은 것.
+# 합계 66 이어야 한다. 구약 5분류(39권) + 신약 5분류(27권).
+BOOK_GROUPS = [
+    ("율법서", 5),      # 창–신
+    ("역사서", 12),     # 수–에
+    ("시가서", 5),      # 욥–아
+    ("대선지서", 5),    # 사–단
+    ("소선지서", 12),   # 호–말
+    ("복음서", 4),      # 마–요
+    ("사도행전", 1),    # 행
+    ("바울서신", 13),   # 롬–몬
+    ("공동서신", 8),    # 히–유
+    ("요한계시록", 1),  # 계
+]
+
+
+def group_per_book():
+    """BOOK_GROUPS 를 66개짜리 평평한 분류명 리스트로 편다."""
+    out = []
+    for name, n in BOOK_GROUPS:
+        out.extend([name] * n)
+    return out
+
 ATTRIBUTION = [
     "성경전서 개역한글판 © 대한성서공회",
     "Place data: OpenBible.info Bible Geocoding (CC BY 4.0)",
@@ -280,9 +318,11 @@ def main():
             total_bytes += len(blob.encode("utf-8"))
 
     # --- index.json
+    groups = group_per_book()
     index = {"books": [
-        {"id": b, "ko": KO_NAMES[i], "abbr": KO_ABBR[i],
-         "testament": "OT" if i < N_OT else "NT", "chapters": chapters_of[b]}
+        {"id": b, "ko": KO_NAMES[i], "abbr": KO_ABBR[i], "en": EN_NAMES[i],
+         "testament": "OT" if i < N_OT else "NT", "group": groups[i],
+         "chapters": chapters_of[b]}
         for i, b in enumerate(krv.OSIS_BOOKS)
     ]}
     (WEB_DATA / "index.json").write_text(

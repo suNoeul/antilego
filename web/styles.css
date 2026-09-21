@@ -31,6 +31,12 @@
   --shadow: 0 1px 3px rgba(60, 45, 25, .07);
   --panel-shadow: -6px 0 24px rgba(60, 45, 25, .10);
   --scrim: rgba(30, 24, 16, .28);
+  /* 성경 찾기 칩 (Spike 04). 구약=파랑 계열 · 신약=빨강 계열. 이 앱의 유일한 새 색이다. */
+  --chip-ot-bg: #e3ecf5;
+  --chip-ot-fg: #2b4f7e;
+  --chip-nt-bg: #f6e3e1;
+  --chip-nt-fg: #8a3b32;
+  --pick-shadow: 0 6px 28px rgba(60, 45, 25, .13);
   --serif: "Noto Serif KR", "Apple SD Gothic Neo", serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   /* 지도 패널. --panel-w-user 는 ≥1200px 에서만 쓰인다 (02-c, app.js 가 바꾼다) */
@@ -68,6 +74,11 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, .3);
   --panel-shadow: -6px 0 24px rgba(0, 0, 0, .4);
   --scrim: rgba(0, 0, 0, .45);
+  --chip-ot-bg: #1f2c3b;
+  --chip-ot-fg: #9cb8d8;
+  --chip-nt-bg: #3a2523;
+  --chip-nt-fg: #e0a29a;
+  --pick-shadow: 0 6px 28px rgba(0, 0, 0, .5);
 }
 
 * { box-sizing: border-box; }
@@ -103,21 +114,44 @@ html { overflow-x: hidden; }
 }
 .grow { flex: 1; }
 
-select {
-  font: inherit;
-  font-size: 14px;
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 4px 6px;
-  max-width: 40vw;
-}
-select:focus-visible, .ghost:focus-visible, .place:focus-visible,
-.fab:focus-visible, .zbtn:focus-visible {
+.ghost:focus-visible, .place:focus-visible, .fab:focus-visible, .zbtn:focus-visible,
+.loc:focus-visible, .bk:focus-visible, .num:focus-visible, .kchip:focus-visible,
+.pick-x:focus-visible, .pick-back:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* --- 상단바의 현재 위치 버튼 (Spike 04). 셀렉트 두 개를 대신한다. --- */
+/* 글자처럼 보이되 눌린다. 쉐브론은 아주 작게 — `▸` 를 90도 돌려 쓴다. */
+.loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 62vw;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.loc:hover { background: var(--hl-soft); }
+#loc-text { overflow: hidden; text-overflow: ellipsis; }
+.loc-chev {
+  flex: 0 0 auto;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--muted);
+  transform: rotate(90deg);
+  transition: transform .15s ease;
+}
+.loc[aria-expanded="true"] .loc-chev { transform: rotate(-90deg); }
 
 .ghost {
   font: inherit;
@@ -484,4 +518,302 @@ body.resizing .panel-map { cursor: col-resize; }
     right: 16px;
     bottom: calc(var(--sheet-h) + 12px);
   }
+}
+
+/* ==========================================================================
+   성경 찾기 (Spike 04) — 권·장·절 선택
+   데스크톱 ≥900px: 상단바 아래 팝오버 3열. 그 아래: 전체 화면 시트 3단계.
+   ========================================================================== */
+
+.picker {
+  position: fixed;
+  z-index: 60;
+  top: calc(var(--topbar-h) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(880px, calc(100vw - 32px));
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--pick-shadow);
+  padding: 12px;
+}
+.picker[hidden] { display: none; }
+
+/* 머리줄 — 데스크톱에선 `×` 하나만 오른쪽 위에 얹힌다. */
+.pick-head {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pick-back, .pick-crumb { display: none; }
+.pick-x {
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pick-x:hover { color: var(--ink); background: var(--hl); }
+
+.pick-qrow { padding-right: 34px; }
+.pick-q {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+.pick-q::placeholder { color: var(--muted); }
+.pick-q:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--hl); }
+
+/* 초성 칩 줄은 모바일 전용이다. */
+.pick-chips { display: none; }
+
+.pick-cols {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+.pick-colwrap { min-width: 0; }
+.pick-colhead {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  color: var(--muted);
+  margin: 0 0 6px;
+  padding-left: 2px;
+}
+/* 숫자가 어느 권의 것인지 — 열 머리에 옅게 덧붙인다. 커서와 선택이 다를 수 있어서다. */
+.colhead-sub {
+  font-weight: 400;
+  letter-spacing: 0;
+  opacity: .8;
+}
+.colhead-sub:not(:empty)::before { content: " · "; }
+
+.pick-col {
+  max-height: min(48vh, 400px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.pick-nums {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 4px;
+  align-content: start;
+}
+
+/* 분류 머리 — 작게, 옅게. */
+.grp {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  color: var(--muted);
+  margin: 12px 0 4px;
+  padding: 0 6px;
+}
+.pick-books > .grp:first-child { margin-top: 0; }
+
+/* 권 한 줄 = 약어 칩 + 한글 + 영문 */
+.bk {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.bk:hover { background: var(--hl-soft); }
+.bk[aria-selected="true"] { background: var(--hl); }
+/* 키보드 커서(↑/↓). 선택(배경)과 겹칠 수 있어 테두리로 구분한다. */
+.bk.hi { box-shadow: inset 0 0 0 1px var(--accent); }
+.bk-ko { flex: 0 0 auto; }
+.bk.cur .bk-ko { color: var(--accent); font-weight: 600; }
+.bk-en {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 약어 칩 — 구약 파랑 · 신약 빨강. 폭 고정. */
+.chip {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 19px;
+  line-height: 19px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  letter-spacing: -.02em;
+}
+.chip-ot { background: var(--chip-ot-bg); color: var(--chip-ot-fg); }
+.chip-nt { background: var(--chip-nt-bg); color: var(--chip-nt-fg); }
+
+.num {
+  font: inherit;
+  font-size: 13px;
+  height: 30px;
+  padding: 0;
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.num:hover { background: var(--hl-soft); }
+.num[aria-selected="true"] {
+  color: var(--accent);
+  font-weight: 700;
+  background: var(--hl);
+  border-color: var(--accent);
+}
+
+.pick-empty, .pick-hint {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  padding: 8px 6px;
+  margin: 0;
+}
+
+/* 절로 뛰었을 때 2초간 표시 (해시 문법은 건드리지 않는다). */
+.verse-hl {
+  background: var(--hl);
+  border-radius: 4px;
+  box-shadow: 0 0 0 4px var(--hl);
+  transition: background .5s ease, box-shadow .5s ease;
+}
+
+/* --- 모바일 <900px: 전체 화면 시트. 지도 시트(40)와 플로팅 버튼(45) 위에 앉는다. --- */
+@media (max-width: 899px) {
+  .picker {
+    inset: 0;
+    top: 0;
+    left: 0;
+    width: auto;
+    max-width: none;
+    transform: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--bg);
+    padding: 8px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .picker[hidden] { display: none; }
+  .pick-head {
+    position: static;
+    flex: 0 0 auto;
+    gap: 6px;
+    height: 36px;
+  }
+  .pick-back {
+    display: inline-flex;
+    align-items: center;
+    font: inherit;
+    font-size: 13px;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    padding: 5px 7px 5px 3px;
+    cursor: pointer;
+  }
+  .pick-back[hidden] { display: none; }
+  .pick-back:hover { color: var(--ink); background: var(--hl); }
+  .pick-crumb {
+    display: block;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .pick-qrow { flex: 0 0 auto; padding-right: 0; }
+
+  /* 초성 칩 줄 — 가로로 넘치면 그 줄만 스크롤된다. 페이지는 넘치지 않는다. */
+  .picker[data-step="2"] .pick-chips,
+  .picker[data-step="3"] .pick-chips { display: none; }
+  .pick-chips {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .pick-chips::-webkit-scrollbar { display: none; }
+  .kchip {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--ink);
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 11px;
+    cursor: pointer;
+  }
+  .kchip[aria-pressed="true"] {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--hl);
+    font-weight: 600;
+  }
+  .kchip-x { font-size: 12px; opacity: .8; }
+
+  .pick-cols {
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 8px;
+  }
+  .pick-colwrap { display: none; height: 100%; flex-direction: column; min-height: 0; }
+  .picker[data-step="1"] .pick-colwrap[data-col="1"],
+  .picker[data-step="2"] .pick-colwrap[data-col="2"],
+  .picker[data-step="3"] .pick-colwrap[data-col="3"] { display: flex; }
+  .pick-colhead { display: none; }
+  .pick-col { flex: 1 1 auto; max-height: none; min-height: 0; -webkit-overflow-scrolling: touch; }
+  .pick-nums { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px; }
+  .num { height: 40px; font-size: 14px; }
+  .bk { padding: 8px 6px; }
 }
