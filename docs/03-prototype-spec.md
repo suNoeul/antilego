@@ -190,7 +190,8 @@ python3 spikes/03-eras/export_web.py     # 의존성 없음. 멱등
   sha256 이고 **양쪽을 같은 포맷으로 계산해 둘 다 찍는다.** 하나라도 어긋나면 `sys.exit(1)`.
   주 로더 `krv.load_bluesaurel()` 은 `.strip()` 도 하지 않는다 (동일성유지권).
 - **완료 검사 (F4)** — `index.json` · `places.json` · `attribution.json` · `eras.json` ·
-  `chapter_eras.json` · `geo/{land,lakes,rivers,meta,era_regions}.json` 10개가 있고 JSON 으로
+  `chapter_eras.json` · **`korea_parallel.json`**(PoC 07) ·
+  `geo/{land,lakes,rivers,meta,era_regions}.json` 11개가 있고 JSON 으로
   읽히는지 확인한다. 하나라도 없으면 빌드 실패.
 - `spikes/03-eras/validate.py` 도 web 시대 파일 3개를 검사한다 — 있는지, 장→시대 배정
   1,189개가 `data/derived` 와 한 장도 빠짐없이 같은지, Feature 68개인지, blob 마다 `rep` 가
@@ -379,6 +380,31 @@ GitHub Pages 는 10분 캐시를 준다. 새 `index.html` 과 옛 `app.js` 가 �
   사라진다(이름 없는 표시는 없다, 02-b 규칙 그대로). 확대하면 겹침이 풀려 되살아난다.
 - 크기는 배율과 무관하게 화면에서 고정(10px / r=3 / 1px). 영역은 지도와 함께 확대·이동한다.
 - 토큰: `--label-dim`, `--region-a/b/c`, `--region-a/b/c-line` (라이트·다크 양쪽).
+
+#### PoC — 동시대 한반도 (플래그 `?korea=1`) · **실험**
+
+> **실험이다.** 플래그 뒤에 숨어 있어서 그냥 들어온 사람에게는 보이지 않는다.
+> 판정이 나기 전까지 스펙의 확정된 부분이 아니다. 되돌리는 법은
+> [`spikes/07-korea-poc/RESULT.md`](../spikes/07-korea-poc/RESULT.md).
+
+성경을 읽는 동안 **같은 시기 한반도에서 무슨 일이 있었는지** 한 줄로 보여준다. 지도는 없고 글자뿐이다.
+
+- 데이터: `data/derived/korea_parallel.json` → `web/data/korea_parallel.json`
+  (`spikes/03-eras/export_web.py` 가 같이 내보낸다. `title` · `caption` · `basis` 만 나간다).
+  키는 `eras.json` 의 era id 이고, `spikes/03-eras/validate.py` 가 그 id 가 실재하는지 본다.
+- **기록이 있는 세 시대에만 항목이 있다** — `return`(고조선 후기, 『위략』) ·
+  `new_testament` · `early_church`(삼국 초기, 삼국사기 전통 연대). 나머지 시대에는 **항목이 없고,
+  항목이 없으면 토글도 줄도 DOM 에 만들지 않는다.** 고고학 시대구분만으로 "이 무렵 한반도는"을
+  쓰면 없는 확신을 만든다 (AGENTS.md "모호하면 보여주지 않는다").
+- 연대의 **기준을 캡션 안이나 바로 뒤 괄호에 반드시 적는다** (`(삼국사기 전통 연대)` 식).
+- 플래그: `?korea=1` 이면 켜지고 `localStorage['korea']='1'` 로 기억한다. `?korea=0` 은 끄고
+  기억도 지운다. 주소에 아무것도 없으면 기억한 값. 기본은 **꺼짐**.
+- UI: 시대 캡션 끝에 작은 글자 토글 **`한반도는?`**(12px, 옅게, `aria-expanded`). 누르면 캡션
+  아래로 한 줄 — `이 무렵 한반도 — <title>: <caption>`, 근거는 더 옅은 괄호(`.korea-basis`).
+  **기본 접힘이고 상태는 기억하지 않는다.**
+- `korea_parallel.json` 은 **플래그가 켜졌을 때만** 받는다(캡션을 처음 그릴 때 한 번). 꺼져 있으면
+  요청 자체가 없다. 못 받으면 조용히 아무것도 띄우지 않는다 — 에러 문구 없음(03-d 와 같은 태도).
+- `undated`/`primeval`(시편·창 1–11)은 캡션이 통째로 숨으므로 이 줄도 같이 숨는다.
 
 ### 성경 찾기 (Spike 04) — 권·장·절
 

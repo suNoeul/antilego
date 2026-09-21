@@ -197,6 +197,40 @@ def main():
                 errors.append(f"web/geo/era_regions: {pr.get('polity_ko')} blob 인데 rep 가 없다")
         web_msgs.append(f"era_regions Feature {len(w_feats)}개")
 
+    # 3d) korea_parallel.json (PoC 07 — 동시대 한반도). 정본이 없으면 실험이 꺼진 것이라 건너뛴다.
+    kor_msg = ""
+    try:
+        kor = load(("data", "derived", "korea_parallel.json"))
+    except FileNotFoundError:
+        kor = None
+    if kor is not None:
+        d_kor = kor.get("eras") or {}
+        for eid, v in d_kor.items():
+            if eid not in era_by_id:
+                errors.append(f"korea_parallel: 알 수 없는 era id {eid!r} "
+                              f"— eras.json 에 있는 id 여야 한다")
+            for k in ("title", "caption", "basis"):
+                if not v.get(k):
+                    errors.append(f"korea_parallel[{eid}]: {k} 가 비어 있다")
+        try:
+            w_kor = load(("web", "data", "korea_parallel.json"))
+        except FileNotFoundError:
+            w_kor = None
+            errors.append("web 파일 없음: web/data/korea_parallel.json — "
+                          "build.py 가 export_web.py 를 부르지 않았다")
+        except json.JSONDecodeError as exc:
+            w_kor = None
+            errors.append(f"web/data/korea_parallel.json JSON 파싱 실패 ({exc})")
+        if w_kor is not None:
+            w_ids = w_kor.get("eras") or {}
+            for eid in w_ids:
+                if eid not in era_by_id:
+                    errors.append(f"web/korea_parallel: 알 수 없는 era id {eid!r}")
+            if sorted(w_ids) != sorted(d_kor):
+                errors.append(f"web/korea_parallel 시대 목록이 derived 와 다르다: "
+                              f"{sorted(w_ids)} != {sorted(d_kor)}")
+            kor_msg = f"{len(w_ids)}개 시대 ({', '.join(sorted(w_ids))})"
+
     # 4) 출력
     print("=== Spike 03 시대 데이터 검증 ===")
     print(f"시대 수            : {len(eras['eras'])}  ({', '.join(era_by_id)})")
@@ -214,6 +248,8 @@ def main():
     print(f"era_regions.json   : {reg_msg or '없음(건너뜀)'}")
     print(f"web/data 시대 3종  : {' · '.join(web_msgs) if web_msgs else '없음'}"
           f"  ({len(web)}/3 파일)")
+    print(f"korea_parallel     : {kor_msg or ('없음(건너뜀)' if kor is None else '웹 파일 확인 실패')}"
+          "  (PoC 07)")
     if misses:
         print("  places.json에 없는 앵커:")
         for eid, ko, name in misses:

@@ -176,6 +176,7 @@ ATTRIBUTION_LEGACY = [
 EXPECTED_FILES = [
     "index.json", "places.json", "attribution.json",
     "eras.json", "chapter_eras.json",
+    "korea_parallel.json",                 # PoC 07 (동시대 한반도). 플래그 ?korea=1 뒤에서만 쓴다
     "geo/land.json", "geo/lakes.json", "geo/rivers.json", "geo/meta.json",
     "geo/era_regions.json",
 ]
