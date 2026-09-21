@@ -246,5 +246,155 @@ await t('NOTION_TOKEN 이 없으면 500', async () => {
   assert.equal(calls.length, 0);
 });
 
+console.log('\n── 저장 URL 검증 (F13) ──');
+const LONG_URL = 'https://sunoeul.github.io/antilego/' + 'a'.repeat(365); // 정확히 400자
+const DROP_URLS = [
+  'http://localhost.evil.example/x',      // 호스트 끝 경계 없음
+  'http://localhost@evil.example/',       // 자격정보로 위장
+  'http://user:pw@localhost:8000/',       // 자격정보는 localhost 여도 버린다
+  'https://sunoeul.github.io/other/',     // 우리 사이트지만 다른 경로
+  'https://sunoeul.github.io/antilego',   // /antilego/ 로 시작하지 않는다
+  LONG_URL,                               // 400자
+  'https://localhost/',                   // 개발 호스트는 http 만
+  'javascript:alert(1)',
+  '주소 아님',
+];
+await t('버려야 할 링크는 버리고 나머지 필드는 저장한다', async () => {
+  assert.equal(LONG_URL.length, 400);
+  for (const u of DROP_URLS) {
+    __resetLimits(); calls = [];
+    const { res } = await call({ body: { ...GOOD, url: u }, headers: ORIGIN });
+    assert.equal(res.statusCode, 200, u);
+    assert.equal(calls.length, 1, u);
+    assert.equal(calls[0].body.properties['링크'], undefined, `링크가 남았다: ${u}`);
+    assert.equal(calls[0].body.properties['내용'].title[0].text.content, GOOD.text, u);
+  }
+});
+
+const KEEP_URLS = [
+  'https://sunoeul.github.io/antilego/',
+  'https://sunoeul.github.io/antilego/#Judg.9',
+  'https://sunoeul.github.io/antilego/index.html?v=1',
+  'http://localhost/',
+  'http://localhost:5173/#Judg.9',
+  'http://127.0.0.1:8000/antilego/',
+];
+await t('정상 링크는 그대로 남긴다', async () => {
+  for (const u of KEEP_URLS) {
+    __resetLimits(); calls = [];
+    await call({ body: { ...GOOD, url: u }, headers: ORIGIN });
+    assert.equal(calls[0].body.properties['링크'].url, u, u);
+  }
+});
+
+await t('300자 경계 — 300자는 남고 301자는 버린다', async () => {
+  const base = 'https://sunoeul.github.io/antilego/#';
+  const at = (n) => base + 'a'.repeat(n - base.length);
+  __resetLimits(); calls = [];
+  await call({ body: { ...GOOD, url: at(300) }, headers: ORIGIN });
+  assert.equal(calls[0].body.properties['링크'].url.length, 300);
+  __resetLimits(); calls = [];
+  await call({ body: { ...GOOD, url: at(301) }, headers: ORIGIN });
+  assert.equal(calls[0].body.properties['링크'], undefined);
+});
+
+console.log('\n── 본문 총량 상한 ──');
+await t('16KB 를 넘는 요청 → 413, Notion 은 안 부른다', async () => {
+  const body = JSON.stringify({ ...GOOD, loc: 'ㅁ'.repeat(20000) });
+  assert.ok(Buffer.byteLength(body, 'utf8') > 16 * 1024);
+  const { res, json } = await call({ body, headers: ORIGIN });
+  assert.equal(res.statusCode, 413);
+  assert.equal(json.ok, false);
+  assert.match(json.error, /너무 큽니다/);
+  assert.equal(calls.length, 0);
+});
+
+await t('16KB 안쪽은 통과한다', async () => {
+  const body = JSON.stringify({ ...GOOD, text: 'ㄱ'.repeat(2000) }); // ≈6KB
+  assert.ok(Buffer.byteLength(body, 'utf8') < 16 * 1024);
+  const { res } = await call({ body, headers: ORIGIN });
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls.length, 1);
+});
+
+await t('req.body 가 미리 문자열로 들어와도 상한이 걸린다', async () => {
+  const req = mkReq({ headers: ORIGIN }); const res = mkRes();
+  req.body = JSON.stringify({ ...GOOD, loc: 'x'.repeat(20000) });
+  await handler(req, res);
+  assert.equal(res.statusCode, 413);
+  assert.equal(calls.length, 0);
+});
+
+console.log('\n── 로그 마스킹 ──');
+// console.error 를 가로채서 "무엇이 로그에 남는지" 그대로 본다.
+async function captureErr(fn) {
+  const keep = console.error; const lines = [];
+  console.error = (...a) => lines.push(a.map(String).join(' '));
+  try { await fn(); } finally { console.error = keep; }
+  return lines.join('\n');
+}
+
+await t('Notion 오류 본문은 로그에 남지 않는다 — status + code 만', async () => {
+  const leak = '{"object":"error","status":401,"code":"unauthorized",'
+    + '"message":"API token is invalid: ntn_FAKE_LEAKED_TOKEN_0123456789"}';
+  const out = await captureErr(async () => {
+    nextResponse = () => ({ ok: false, status: 401, text: async () => leak });
+    const { res } = await call({ body: GOOD, headers: ORIGIN });
+    assert.equal(res.statusCode, 502);
+  });
+  assert.ok(!out.includes('ntn_'), `로그에 토큰이 남았다: ${out}`);
+  assert.ok(!out.includes('API token'), `로그에 upstream 메시지가 남았다: ${out}`);
+  assert.ok(out.includes('401'), `상태 코드가 없다: ${out}`);
+  assert.ok(out.includes('unauthorized'), `code 가 없다: ${out}`);
+});
+
+await t('code 가 이상하면 남기지 않는다', async () => {
+  const out = await captureErr(async () => {
+    nextResponse = () => ({ ok: false, status: 400, text: async () => '{"code":"ntn_FAKE 붙은 값"}' });
+    await call({ body: GOOD, headers: ORIGIN });
+  });
+  assert.ok(!out.includes('ntn_'), out);
+  assert.match(out, /\[feedback\] notion 저장 실패 400 -/);
+});
+
+await t('fetch 예외 메시지는 로그에 안 남는다', async () => {
+  const out = await captureErr(async () => {
+    nextResponse = () => { throw new Error('connect ECONNREFUSED — Bearer ntn_FAKE_LEAKED'); };
+    const { res } = await call({ body: GOOD, headers: ORIGIN });
+    assert.equal(res.statusCode, 502);
+  });
+  assert.ok(!out.includes('ntn_'), out);
+  assert.ok(!out.includes('ECONNREFUSED'), out);
+  assert.equal(out.trim(), '[feedback] notion 요청 실패');
+});
+
+await t('요청 본문·토큰은 어떤 로그에도 안 나온다 (정상 경로)', async () => {
+  const out = await captureErr(async () => { await call({ body: GOOD, headers: ORIGIN }); });
+  assert.equal(out, '');
+});
+
+console.log('\n── Notion 데이터 소스 전환 준비 ──');
+const DS_ID = 'ecef24df-41c2-43d1-aecf-76ce0052908d';
+await t('NOTION_DATA_SOURCE_ID 없음 → 2022-06-28 + parent.database_id', async () => {
+  assert.equal(process.env.NOTION_DATA_SOURCE_ID, undefined);
+  await call({ body: GOOD, headers: ORIGIN });
+  assert.equal(calls[0].init.headers['Notion-Version'], '2022-06-28');
+  assert.deepEqual(calls[0].body.parent, { database_id: '8a563b39-003e-4616-89f4-fb2144f90e4f' });
+});
+
+await t('NOTION_DATA_SOURCE_ID 있음 → 2025-09-03 + parent.data_source_id', async () => {
+  process.env.NOTION_DATA_SOURCE_ID = DS_ID;
+  try {
+    await call({ body: GOOD, headers: ORIGIN });
+    assert.equal(calls[0].init.headers['Notion-Version'], '2025-09-03');
+    assert.deepEqual(calls[0].body.parent, { type: 'data_source_id', data_source_id: DS_ID });
+    // 나머지 payload 는 그대로여야 한다
+    const p = calls[0].body.properties;
+    assert.equal(p['내용'].title[0].text.content, GOOD.text);
+    assert.equal(p['링크'].url, GOOD.url);
+    assert.equal(calls[0].body.children[0].paragraph.rich_text[0].text.content, GOOD.text);
+  } finally { delete process.env.NOTION_DATA_SOURCE_ID; }
+});
+
 console.log(`\n${pass} 통과, ${fail} 실패`);
 process.exit(fail ? 1 : 0);

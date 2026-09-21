@@ -21,7 +21,7 @@ api/                     ← Vercel 프로젝트 루트 (vercel --cwd api)
 │   └── feedback.js      ← 함수 하나. /api/feedback 로 뜬다
 └── test/
     ├── local.mjs        Vercel 없이 :3300 에 띄우는 어댑터
-    └── notion-mock.mjs  fetch 를 가로채 요청 본문을 검사 (24개)
+    └── notion-mock.mjs  fetch 를 가로채 요청 본문을 검사 (36개)
 ```
 
 헷갈리기 쉬운 곳: `api/feedback.js` (루트 바로 아래) 가 아니라 `api/api/feedback.js` 다.
@@ -36,8 +36,11 @@ api/                     ← Vercel 프로젝트 루트 (vercel --cwd api)
 |---|---|---|
 | `NOTION_TOKEN` | 예 | Notion 내부 통합(internal integration)의 토큰 (`ntn_…`). 서버에만 둔다 |
 | `NOTION_DB_ID` | 아니오 | 기본값 `8a563b39-003e-4616-89f4-fb2144f90e4f` (📮 Feedback) |
+| `NOTION_DATA_SOURCE_ID` | 아니오 | **설정하면** `Notion-Version: 2025-09-03` + `parent.data_source_id` 로 갈아탄다. 비워 두면 지금까지 하던 대로 (아래 "Notion API 버전") |
 
-토큰은 응답에도 로그에도 절대 나오지 않는다.
+토큰은 응답에도 로그에도 절대 나오지 않는다. 저장 실패 시 로그에 남는 것은 **고정 문구 + HTTP 상태
+코드 + Notion 이 준 `code` 필드**뿐이다 — upstream 응답 본문과 예외 메시지는 찍지 않는다.
+`code` 도 `[a-z_]` 로만 된 값일 때만 남기고, 아니면 `-` 로 적는다.
 
 ## Notion 쪽 준비 (한 번만)
 
@@ -75,14 +78,27 @@ Notion 이 2025-09-03 버전에서 **데이터 소스(data source)** 를 도입�
   옛 버전을 끄겠다는 일정은 Notion 이 아직 내놓지 않았다.
 - 누군가 📮 Feedback DB 에 **두 번째 데이터 소스를 붙이는 순간** 400
   (`Databases with multiple data sources are not supported in this API version`) 이 난다.
-- 그때는 `feedback.js` 의 `NOTION_VERSION` 을 `2025-09-03` 이상으로 올리고
-  `notionPayload()` 의 `parent` 를 아래로 바꾼다. 나머지(properties, children)는 그대로다.
 
-```js
-parent: { type: 'data_source_id', data_source_id: 'ecef24df-41c2-43d1-aecf-76ce0052908d' }
+### 전환 스위치 — 코드를 안 고친다
+
+**`NOTION_DATA_SOURCE_ID` 환경변수 하나로 갈아탄다.** 코드는 이미 두 모양을 다 만들 줄 안다.
+
+| `NOTION_DATA_SOURCE_ID` | Notion-Version | parent |
+|---|---|---|
+| 비어 있음 (지금) | `2022-06-28` | `{ database_id: <NOTION_DB_ID 또는 기본값> }` |
+| 값이 있음 | `2025-09-03` | `{ type: "data_source_id", data_source_id: <값> }` |
+
+```bash
+vercel env add NOTION_DATA_SOURCE_ID production --cwd api   # 값을 붙여넣고 재배포
+vercel env rm  NOTION_DATA_SOURCE_ID production --cwd api   # 되돌리기
 ```
 
-이 DB 의 데이터 소스 id 는 **`ecef24df-41c2-43d1-aecf-76ce0052908d`** 다.
+properties · children 은 두 경우가 똑같다. `notion-mock.mjs` 가 양쪽 payload 모양을 모두 검사한다.
+
+넣을 값은 DB 의 `data_sources` 에서 **의도한 소스를 직접 확인**해서 고른다 — DB ID 를 그대로
+재사용하거나 첫 번째 소스를 무조건 고르면 안 된다 (리뷰 "Notion API 버전" 항목).
+2026-09-21 기준 📮 Feedback DB 의 데이터 소스는 **`ecef24df-41c2-43d1-aecf-76ce0052908d`**
+하나이고, 실제 소스 수·권한은 그때 다시 확인한다.
 
 참고: https://developers.notion.com/docs/upgrade-faqs-2025-09-03
 
@@ -101,7 +117,7 @@ parent: { type: 'data_source_id', data_source_id: 'ecef24df-41c2-43d1-aecf-76ce0
 | `text` | **필수**, 2000자까지 |
 | `name` | 40자까지. 비면 `익명` |
 | `loc` | 120자까지 (넘으면 자른다) |
-| `url` | `https://sunoeul.github.io/antilego/` 또는 `http://localhost` 로 시작해야 저장. 아니면 버린다 |
+| `url` | `new URL()` 로 파싱해 검사한다. **300자까지.** 저장하는 건 ① origin 이 정확히 `https://sunoeul.github.io` 이고 경로가 `/antilego/` 로 시작하거나 ② 호스트가 정확히 `localhost`·`127.0.0.1` 인 `http://` (포트 무관). 자격정보(`user:pw@`)가 붙으면 버린다. 조건에 안 맞으면 **링크만** 버리고 나머지는 저장한다 |
 | `device` | `폰`·`태블릿`·`데스크톱` 중 하나. 아니면 `모름` |
 | `hp` | **허니팟.** 사람 눈에 안 보이는 칸. 채워져 있으면 200 을 주고 아무것도 저장하지 않는다 |
 | `ts` | 받기만 하고 **무시**한다. 시각은 서버가 찍는다 |
@@ -114,9 +130,16 @@ parent: { type: 'data_source_id', data_source_id: 'ecef24df-41c2-43d1-aecf-76ce0
 | 400 | 검증 실패 · JSON 아님 |
 | 403 | `Origin` 이 허용 목록 밖 |
 | 405 | POST·OPTIONS 아님 |
+| 413 | 요청 본문이 16KB 를 넘음 |
 | 429 | 레이트 리밋 (`Retry-After` 붙음) |
 | 500 | `NOTION_TOKEN` 미설정 |
 | 502 | Notion 이 거절했거나 닿지 않음 |
+
+## 입력 총량
+
+요청 본문은 **16KB** 까지 받는다. 스트림을 읽으면서 세다가 넘으면 그 자리에서 끊고 413 을 준다
+(플랫폼 상한에 기대지 않는다 — 로컬과 배포가 같게 동작하도록). 그 안쪽에서 `text` 2000자,
+`name` 40자, `loc` 120자, `url` 300자가 각각 걸린다.
 
 ## CORS
 
@@ -134,6 +157,10 @@ parent: { type: 'data_source_id', data_source_id: 'ecef24df-41c2-43d1-aecf-76ce0
 서버리스에서 인스턴스가 여러 개 뜨면 **각각 따로 센다**. 콜드 스타트에도 초기화된다.
 그래서 정확한 방어가 아니라 실수·단순 스팸을 거르는 용도다. 진짜로 막아야 할 일이
 생기면 Vercel WAF 의 rate limit 나 외부 KV 로 옮긴다.
+
+CORS 와 허니팟은 **인증이 아니다** — `Origin` 헤더를 안 붙이는 직접 요청(curl 등)은 그대로 통과한다.
+엄격한 상한이 필요해지면 공유 원자 카운터나 플랫폼 쪽 방어가 있어야 한다. `x-forwarded-for` 의
+신뢰 경계도 배포 환경에서 확인한 뒤에 단정한다 (리뷰 "레이트 리밋" 항목).
 
 ## 배포
 
@@ -185,7 +212,7 @@ curl -i -X POST "$API" \
 
 ```bash
 cd api
-node test/notion-mock.mjs          # 24개 검사. 네트워크 안 씀
+node test/notion-mock.mjs          # 36개 검사. 네트워크 안 씀
 MOCK_NOTION=1 node test/local.mjs  # :3300. Notion 으로 보낼 본문을 콘솔에 찍는다
 NOTION_TOKEN=ntn_… node test/local.mjs   # 진짜 Notion 에 쓴다
 ```
