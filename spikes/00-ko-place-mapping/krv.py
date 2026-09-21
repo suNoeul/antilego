@@ -5,7 +5,10 @@
   bluesaurel data/raw/krv/bluesaurel_1961_krv.json (66권 1189장 31102절, 옛 표기 보존)
   yuhwan    data/raw/krv/yuhwan/*.json             (66권 31102절, 표기 일부 현대화)
 
-본문은 수정하지 않는다(동일성유지권). strip 외에는 손대지 않는다.
+본문은 수정하지 않는다(동일성유지권).
+**주 본문 로더 `load_bluesaurel()` 은 원본 문자열을 그대로 돌려준다** — strip 도 하지 않는다
+(2026-09-21, 리뷰 F5). web/data/ 로 나가는 본문은 이 로더만 쓴다.
+비교·정규화용 로더(`load_yuhwan`·`load_unbound`)는 판본 대조에만 쓰므로 strip 이 남아 있다.
 `python krv.py` 로 실행하면 무결성 리포트를 찍는다.
 """
 import json
@@ -55,17 +58,19 @@ EN2OSIS = dict(zip(EN_BOOKS, OSIS_BOOKS))
 
 
 def load_bluesaurel():
+    """주 본문. 원본 문자열을 **한 글자도 손대지 않고** 돌려준다 (strip 없음 — F5)."""
     data = json.loads((RAW / "krv" / "bluesaurel_1961_krv.json").read_text(encoding="utf-8"))
     out = {}
     for book in data:
         b = EN2OSIS[book["book"]]
         for ch in book["chapters"]:
             for v in ch["verses"]:
-                out[f"{b}.{ch['chapter']}.{v['verse']}"] = v["text"].strip()
+                out[f"{b}.{ch['chapter']}.{v['verse']}"] = v["text"]
     return out
 
 
 def load_yuhwan():
+    """대조용 전자본. 정규화 비교에만 쓰므로 strip 이 남아 있다 (web 으로 나가지 않는다)."""
     out = {}
     for ko in KO_BOOKS:
         d = json.loads((RAW / "krv" / "yuhwan" / f"{ko}.json").read_text(encoding="utf-8"))

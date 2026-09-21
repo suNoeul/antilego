@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import runpy
 import shutil
 import sys
 from collections import Counter, defaultdict
@@ -33,11 +34,38 @@ DERIVED = ROOT / "data" / "derived"
 WEB_DATA = ROOT / "web" / "data"
 
 MIN_CONF = 0.6          # 스펙: places.ko.json 의 confidence >= 0.6 만 밑줄에 쓴다
-# 스펙에 적힌 흔한 조사. 긴 것부터 시도한다.
+# 스펙에 적힌 흔한 조사. 긴 것부터 시도한다. (locate 의 "조사 제거 재시도" 용)
 JOSA = ["까지", "부터", "에서", "에게", "으로", "에", "을", "를", "이", "가",
         "과", "와", "의", "로", "은", "는", "도"]
 JOSA = sorted(JOSA, key=len, reverse=True)
 MIN_KO_LEN = 2          # 조사를 뗀 뒤 남는 길이 하한 (1음절 오매칭 방지)
+
+# --- 낱말 경계 규칙 (F6, 2026-09-21) --------------------------------------
+# 후보 span [s, e) 는 두 가지를 모두 만족해야 살아남는다.
+#   (1) 앞: text[s-1] 이 한글 음절이면 버린다 — 지명은 어절 처음에서 시작해야 한다.
+#          (겔 27:19 `워단` 의 `단`, `므소바` 의 `소바` 가 여기서 죽는다)
+#   (2) 뒤: e 부터 이어지는 한글 덩어리(공백·문장부호 전까지)가 아래 셋 중 하나여야 한다.
+#          a) JOSA_OK 조각의 이어붙임으로 전부 쪼개진다      (…에서부터 · …까지요)
+#          b) 서술격·호격 조사로 시작한다 (이/여/아/야)      (시온이여 · 고라신아)
+#          c) SUFFIX_OK 로 시작한다 — 지명+보통명사라 여전히 그 지명 (요단강 · 세일산)
+#          그 밖이면 버린다. `유대인` 의 `인`, `바벨론` 의 `론` 이 여기서 죽는다.
+HANGUL_FIRST, HANGUL_LAST = "\uac00", "\ud7a3"
+
+# 조사·보조사. (b)(c) 가 따로 있으므로 여기에 어미를 넣지 않는다.
+JOSA_OK = [
+    "으로부터", "에서부터", "에게로", "에게서", "에서는", "으로는", "이라도", "부터는",
+    "에서", "으로", "에게", "까지", "부터", "이나", "이며", "이라", "이요", "라도",
+    "보다", "처럼", "같이", "마다", "조차", "이든", "에는", "으로서", "니라", "더라",
+    "로서", "로다", "밖에", "마저", "이란", "리로다", "리라",
+    "에", "로", "을", "를", "이", "가", "과", "와", "의", "은", "는", "도",
+    "나", "며", "라", "요", "든", "아", "야", "여", "니", "만", "뿐", "란",
+]
+JOSA_OK = sorted(set(JOSA_OK), key=len, reverse=True)
+
+# 지명 + 보통명사 = 여전히 그 지명. 좁게 유지한다 (사람을 가리키는 `인` 은 일부러 없다).
+SUFFIX_OK = ("골짜기", "성읍", "광야", "산지", "지방", "바다", "시내", "평지", "고개",
+             "수풀", "언덕", "사람", "거민", "동산", "산", "강", "성", "땅", "왕", "국",
+             "골", "섬", "들", "못", "샘", "굴", "문", "해", "속", "길", "궁", "등")
 
 # 개역한글 권명(대한성서공회 표기)과 한글 약어. krv.OSIS_BOOKS 와 같은 순서.
 KO_NAMES = [
@@ -100,19 +128,88 @@ def group_per_book():
         out.extend([name] * n)
     return out
 
-ATTRIBUTION = [
+# --- 출처 표기 (F11, 2026-09-21) -------------------------------------------
+# CC BY 4.0 은 저작자·출처·라이선스 링크와 "고쳤으면 고쳤다"는 고지를 요구한다.
+# `sources` 가 정본이고 `legacy` 는 06-b 가 UI 를 바꾸기 전까지 쓰는 옛 문자열 배열이다.
+ATTRIBUTION_SOURCES = [
+    {
+        "text": "성경전서 개역한글판",
+        "author": "대한성서공회",
+        "url": "https://www.bskorea.or.kr/",
+        "license": "저작재산권 만료 · 성명표시",
+        "license_url": None,
+        "changes": "없음 — 원문 그대로",
+    },
+    {
+        "text": "OpenBible.info Bible Geocoding",
+        "author": "OpenBible.info",
+        "url": "https://www.openbible.info/geo/",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "changes": "장소 선별·좌표 대표점 선택·한글 지명 매핑",
+    },
+    {
+        "text": "STEPBible TIPNR",
+        "author": "Tyndale House, Cambridge",
+        "url": "https://github.com/STEPBible/STEPBible-Data",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "changes": "동명이지 식별에 사용",
+    },
+    {
+        "text": "Natural Earth 1:10m",
+        "author": "Natural Earth",
+        "url": "https://www.naturalearthdata.com/",
+        "license": "public domain",
+        "license_url": None,
+        "changes": "bbox 클리핑·단순화",
+    },
+]
+ATTRIBUTION_LEGACY = [
     "성경전서 개역한글판 © 대한성서공회",
     "Place data: OpenBible.info Bible Geocoding (CC BY 4.0)",
     "Proper names: STEPBible TIPNR (CC BY 4.0)",
     "Basemap: Natural Earth (public domain)",
 ]
 
+# web/data/ 에 반드시 있어야 하는 최상위 파일 (빌드 끝에 확인한다 — F4)
+EXPECTED_FILES = [
+    "index.json", "places.json", "attribution.json",
+    "eras.json", "chapter_eras.json",
+    "geo/land.json", "geo/lakes.json", "geo/rivers.json", "geo/meta.json",
+    "geo/era_regions.json",
+]
+
 
 # --------------------------------------------------------------------------- 입력
 
 def load_text():
-    """{osisID: 개역한글 본문} — Spike 00 의 bluesaurel 로더 그대로."""
+    """{osisID: 개역한글 본문} — Spike 00 의 bluesaurel 로더 그대로.
+
+    `krv.load_bluesaurel()` 은 원본 JSON 의 문자열을 **아무것도 손대지 않고** 돌려준다
+    (F5, 2026-09-21: strip 제거). 빌드 끝의 `verify_text()` 가 산출물과 전수 대조한다.
+    """
     return krv.load_bluesaurel()
+
+
+def raw_text_strings():
+    """원본 JSON 에서 바로 읽은 {osisID: 문자열}. 검증용 — 로더를 거치지 않는다."""
+    data = json.loads((RAW / "krv" / "bluesaurel_1961_krv.json").read_text(encoding="utf-8"))
+    out = {}
+    for book in data:
+        b = krv.EN2OSIS[book["book"]]
+        for ch in book["chapters"]:
+            for v in ch["verses"]:
+                out[f"{b}.{ch['chapter']}.{v['verse']}"] = v["text"]
+    return out
+
+
+def text_hash(d):
+    """{osisID: 본문} 의 sha256. 원본·산출물에 같은 포맷으로 쓴다."""
+    h = hashlib.sha256()
+    for osis in sorted(d):
+        h.update(osis.encode() + b"\t" + d[osis].encode() + b"\n")
+    return h.hexdigest()
 
 
 def load_openbible():
@@ -155,14 +252,18 @@ def load_places_ko():
     돌려도 살아남게 하려고 `places.ko.json` 자체는 건드리지 않는다.
       {place_id: {"ko": "구브로", "conf": 1.0, "note": …, "evidence": …}}
       ko 가 null 이면 그 장소는 밑줄에서 통째로 뺀다(억제).
-    반환값은 (ko_map, n_applied, suppressed) — suppressed 는 억제된 place_id 집합.
+    반환값은 (ko_map, n_applied, suppressed, one_syl) —
+      suppressed : 억제된(ko=null) place_id 집합
+      one_syl    : **수동 오버라이드로 확정된 1음절 지명**의 place_id 집합 (F12).
+                   1음절 지명은 이 집합에 있을 때만 쓴다 — 조사를 뗀 뒤 1음절이 남는
+                   자동 후보는 여전히 버린다.
     """
     ko_map = json.loads((DERIVED / "places.ko.json").read_text(encoding="utf-8"))
     path = DERIVED / "places.ko.overrides.json"
     if not path.exists():
-        return ko_map, 0, set()
+        return ko_map, 0, set(), set()
     ov = json.loads(path.read_text(encoding="utf-8"))
-    suppressed = set()
+    suppressed, one_syl = set(), set()
     for pid, o in sorted(ov.items()):
         entry = dict(ko_map.get(pid) or {})
         entry["ko"] = o["ko"]
@@ -171,37 +272,86 @@ def load_places_ko():
         ko_map[pid] = entry
         if o["ko"] is None:
             suppressed.add(pid)
-    return ko_map, len(ov), suppressed
+        elif len(o["ko"]) == 1 and (o.get("conf") or 0.0) >= 1.0:
+            one_syl.add(pid)
+    return ko_map, len(ov), suppressed, one_syl
 
 
 # ----------------------------------------------------------------- 밑줄 (mention)
 
-def josa_stripped(ko: str):
-    """조사 하나를 뗀 형태들 (긴 조사 우선). 스펙의 재시도 후보."""
+def is_hangul(ch: str) -> bool:
+    return HANGUL_FIRST <= ch <= HANGUL_LAST
+
+
+def hangul_run(text: str, i: int) -> str:
+    """text[i] 부터 이어지는 한글 음절 덩어리 (공백·문장부호 전까지)."""
+    j = i
+    while j < len(text) and is_hangul(text[j]):
+        j += 1
+    return text[i:j]
+
+
+def josa_run_ok(run: str) -> bool:
+    """덩어리 전체가 JOSA_OK 조각의 이어붙임으로 쪼개지는가 (긴 조각 우선)."""
+    if not run:
+        return True
+    i = 0
+    while i < len(run):
+        for j in JOSA_OK:
+            if run.startswith(j, i):
+                i += len(j)
+                break
+        else:
+            return False
+    return True
+
+
+def tail_ok(run: str) -> bool:
+    """span 뒤의 한글 덩어리를 받아들일지 (낱말 경계 규칙 (2))."""
+    if josa_run_ok(run):
+        return True
+    if run[0] in "이여아야":              # 서술격·호격 조사 (시온이여 · 고라신아)
+        return True
+    return run.startswith(SUFFIX_OK)     # 지명 + 보통명사 (요단강 · 세일산 · 소돔왕)
+
+
+def josa_stripped(ko: str, min_len: int = MIN_KO_LEN):
+    """조사 하나를 뗀 형태들 (긴 조사 우선). 스펙의 재시도 후보.
+
+    min_len 은 뗀 뒤 남아야 하는 길이 하한. 1음절 재시도는 수동 오버라이드로
+    확정된 1음절 지명에만 허용한다 (F12).
+    """
     out = []
     for j in JOSA:
-        if ko.endswith(j) and len(ko) - len(j) >= MIN_KO_LEN:
+        if ko.endswith(j) and len(ko) - len(j) >= min_len:
             out.append(ko[: -len(j)])
     return out
 
 
 def find_all(text: str, needle: str):
-    """겹치지 않는 전체 출현 위치 [(s, e)]."""
+    """겹치지 않는 전체 출현 위치 [(s, e)]. **낱말 경계 규칙을 통과한 것만** (F6)."""
     spans, i = [], 0
     while True:
         i = text.find(needle, i)
         if i < 0:
             return spans
-        spans.append((i, i + len(needle)))
-        i += len(needle)
+        e = i + len(needle)
+        if (i == 0 or not is_hangul(text[i - 1])) and tail_ok(hangul_run(text, e)):
+            spans.append((i, e))
+            i = e
+        else:
+            i += 1          # 경계에서 막힌 자리 다음부터 다시 찾는다
 
 
-def locate(text: str, ko: str):
-    """스펙 밑줄 규칙 2. (spans, used_form) — 못 찾으면 ([], None)."""
+def locate(text: str, ko: str, allow_one: bool = False):
+    """스펙 밑줄 규칙 2. (spans, used_form) — 못 찾으면 ([], None).
+
+    allow_one 이면 조사를 뗀 뒤 1음절이 남는 후보도 쓴다 (F12 — 수동 1음절 오버라이드).
+    """
     spans = find_all(text, ko)
     if spans:
         return spans, ko
-    for cand in josa_stripped(ko):
+    for cand in josa_stripped(ko, 1 if allow_one else MIN_KO_LEN):
         spans = find_all(text, cand)
         if spans:
             return spans, cand
@@ -218,15 +368,84 @@ def resolve_overlaps(cands):
     return sorted(taken)
 
 
+# --------------------------------------------------------------------- 산출물 검증
+
+def read_emitted_text():
+    """방금 쓴 web/data/books/*/*.json 을 다시 읽어 {osisID: text} 로 편다."""
+    out = {}
+    for path in sorted((WEB_DATA / "books").rglob("*.json")):
+        obj = json.loads(path.read_text(encoding="utf-8"))
+        b, c = obj["book"], obj["chapter"]
+        for v in obj["verses"]:
+            out[f"{b}.{c}.{v['v']}"] = v["text"]
+    return out
+
+
+def verify_text(raw):
+    """본문 무수정 보장 (F5). 하나라도 어긋나면 빌드를 실패시킨다.
+
+    1. 절 키 집합이 원본과 정확히 같다 (31,102개)
+    2. 절마다 문자열이 원본과 **완전히 같다** (strip·정규화 없음)
+    3. 모든 문자가 BMP 안에 있다 → 파이썬 인덱스 == JS(UTF-16) 인덱스
+    4. 원본 해시 == 산출물 해시 (같은 포맷)
+    """
+    emitted = read_emitted_text()
+    problems = []
+    missing = sorted(set(raw) - set(emitted))
+    extra = sorted(set(emitted) - set(raw))
+    if missing:
+        problems.append(f"산출물에 없는 절 {len(missing):,}개 (예: {missing[:3]})")
+    if extra:
+        problems.append(f"원본에 없는 절 {len(extra):,}개 (예: {extra[:3]})")
+    diff = [r for r in sorted(set(raw) & set(emitted)) if raw[r] != emitted[r]]
+    if diff:
+        problems.append(f"본문이 다른 절 {len(diff):,}개 (예: {diff[:3]})")
+    non_bmp = sorted(r for r, t in emitted.items() if any(ord(ch) > 0xFFFF for ch in t))
+    if non_bmp:
+        problems.append(f"BMP 밖 문자가 있는 절 {len(non_bmp):,}개 (예: {non_bmp[:3]}) "
+                        "— s/e 오프셋이 JS 와 어긋난다")
+    h_raw, h_out = text_hash(raw), text_hash(emitted)
+    if h_raw != h_out:
+        problems.append("해시 불일치")
+    print()
+    print(f"본문 해시 원본   (sha256, {len(raw):,}절): {h_raw}")
+    print(f"본문 해시 산출물 (sha256, {len(emitted):,}절): {h_out}")
+    print(f"본문 무수정 검사: {'OK' if not problems else 'FAIL'}"
+          f"  (절 {len(emitted):,} · BMP 전용 · 원본 == 산출물)")
+    for msg in problems:
+        print(f"  x {msg}")
+    return problems
+
+
+def verify_files():
+    """web/data/ 완료 검사 (F4). 있어야 할 최상위 파일이 다 있고 JSON 으로 읽히는가."""
+    problems = []
+    for rel in EXPECTED_FILES:
+        path = WEB_DATA / rel
+        if not path.exists():
+            problems.append(f"없음: web/data/{rel}")
+            continue
+        try:
+            json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:                                  # noqa: BLE001
+            problems.append(f"JSON 파싱 실패: web/data/{rel} ({exc})")
+    print(f"완료 검사: {'OK' if not problems else 'FAIL'}  "
+          f"(필수 파일 {len(EXPECTED_FILES)}개)")
+    for msg in problems:
+        print(f"  x {msg}")
+    return problems
+
+
 # --------------------------------------------------------------------------- 빌드
 
 def main():
     print("입력 읽는 중 …")
     text = load_text()
     ob = load_openbible()
-    ko_map, n_overrides, suppressed = load_places_ko()
+    ko_map, n_overrides, suppressed, one_syl = load_places_ko()
     print(f"  절 {len(text):,}  OpenBible 장소 {len(ob):,}  ko 매핑 {len(ko_map):,}")
-    print(f"  수동 오버라이드 적용 {n_overrides:,}건 (그중 억제 {len(suppressed):,}곳)")
+    print(f"  수동 오버라이드 적용 {n_overrides:,}건 "
+          f"(그중 억제 {len(suppressed):,}곳 · 1음절 허용 {len(one_syl):,}곳)")
 
     # 좌표 없는 장소는 places.json 에 넣을 수 없다 (스펙). 밑줄도 달지 않는다
     # — p 가 places.json 에 없으면 UI 가 카드를 못 그리기 때문.
@@ -256,7 +475,7 @@ def main():
                 unlocated.append({"p": pid, "en": info["en"], "ko": ko, "ref": osis,
                                   "why": "본문에 그 절이 없음"})
                 continue
-            spans, used = locate(t, ko)
+            spans, used = locate(t, ko, allow_one=pid in one_syl)
             if not spans:
                 unlocated.append({"p": pid, "en": info["en"], "ko": ko, "ref": osis,
                                   "why": "본문에서 못 찾음"})
@@ -340,13 +559,18 @@ def main():
         json.dumps(places, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
         encoding="utf-8")
 
-    # --- attribution.json
+    # --- attribution.json (F11: 객체 배열 + 옛 문자열 배열)
     (WEB_DATA / "attribution.json").write_text(
-        json.dumps(ATTRIBUTION, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        json.dumps({"sources": ATTRIBUTION_SOURCES, "legacy": ATTRIBUTION_LEGACY},
+                   ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
     # --- geo/
     print("geo 만드는 중 …")
     geo = build_geo.build(WEB_DATA)
+
+    # --- 시대 3종 (F4: 빌드가 web/data/ 를 지우므로 반드시 여기서 다시 만든다)
+    print("시대 파일 만드는 중 …")
+    runpy.run_path(str(ROOT / "spikes" / "03-eras" / "export_web.py"), run_name="__main__")
 
     # --- 요약
     web_bytes = sum(p.stat().st_size for p in WEB_DATA.rglob("*") if p.is_file())
@@ -398,11 +622,12 @@ def main():
     }, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"상세 리포트: {work / 'spike01_report.json'}")
 
-    # 무결성: 본문이 원본과 한 글자도 다르지 않은지
-    h = hashlib.sha256()
-    for osis in sorted(text):
-        h.update(osis.encode() + b"\t" + text[osis].encode() + b"\n")
-    print(f"본문 해시(sha256, 31,102절): {h.hexdigest()}")
+    # --- 무결성 검사 (F5 본문 무수정 · F4 완료 검사). 하나라도 어긋나면 빌드 실패.
+    problems = verify_text(raw_text_strings())
+    problems += verify_files()
+    if problems:
+        print("\n빌드 실패 — 위 문제를 고치기 전에는 web/data/ 를 쓰지 않는다.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

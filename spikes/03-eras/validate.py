@@ -2,6 +2,12 @@
 # -*- coding: utf-8 -*-
 """Spike 03 검증: 시대 데이터가 성경 전체를 빠짐없이 덮는지, 앵커 지명이 실제로 있는지 확인한다.
 
+정본은 `data/derived/` 이고 `web/data/` 는 파생물이다. 2026-09-21(리뷰 F4)부터
+**web 으로 나간 시대 파일 3개도 함께 검사한다** — 있고, JSON 으로 읽히고,
+장→시대 배정 1,189개가 derived 와 한 장도 빠짐없이 같고, Feature 수가 같은지.
+빌드가 web/data/ 를 통째로 지우고 다시 만들기 때문에 이 검사가 없으면
+시대 파일이 사라진 채로도 PASS 가 나온다.
+
 사용:  python3 spikes/03-eras/validate.py     (저장소 루트에서)
 """
 import json, os, sys, collections
@@ -127,6 +133,70 @@ def main():
                     errors.append(f"era_regions 불일치 {k}: eras.json={want.get(k)} / regions={got.get(k)}")
         reg_msg = f"Feature {len(reg['features'])}개"
 
+    # 3c) web/data/ 로 나간 시대 파일 3개 (F4)
+    WEB_ERA_FILES = [("web", "data", "eras.json"),
+                     ("web", "data", "chapter_eras.json"),
+                     ("web", "data", "geo", "era_regions.json")]
+    web = {}
+    web_msgs = []
+    for parts in WEB_ERA_FILES:
+        rel = "/".join(parts)
+        try:
+            web[parts[-1] if parts[-1] != "era_regions.json" else "era_regions"] = load(parts)
+        except FileNotFoundError:
+            errors.append(f"web 시대 파일 없음: {rel} — build.py 가 export_web.py 를 부르지 않았다")
+        except json.JSONDecodeError as exc:
+            errors.append(f"web 시대 파일 JSON 파싱 실패: {rel} ({exc})")
+
+    def expand(chspec):
+        """{book: {default, ranges}} -> {(book, chapter): era_id}. 1,189개가 나와야 한다."""
+        out = {}
+        for bid, spec in chspec.items():
+            if bid.startswith("_") or bid not in books:
+                continue
+            n = books[bid]["chapters"]
+            slots = [spec.get("default")] * n
+            for a, b, eid in spec.get("ranges", []):
+                if 1 <= a <= b <= n:
+                    for c in range(a, b + 1):
+                        slots[c - 1] = eid
+            for i, eid in enumerate(slots, 1):
+                out[(bid, i)] = eid
+        return out
+
+    if "eras.json" in web:
+        d_ids = [e["id"] for e in eras["eras"]]
+        w_ids = [e["id"] for e in web["eras.json"]["eras"]]
+        if d_ids != w_ids:
+            errors.append(f"web/eras.json 시대 목록이 derived 와 다르다: {w_ids} != {d_ids}")
+        web_msgs.append(f"eras {len(w_ids)}개")
+    if "chapter_eras.json" in web:
+        d_map, w_map = expand(chmap), expand(web["chapter_eras.json"])
+        if len(w_map) != 1189:
+            errors.append(f"web/chapter_eras.json 장 수 {len(w_map)} — 1189 이어야 한다")
+        bad = sorted(k for k in set(d_map) | set(w_map) if d_map.get(k) != w_map.get(k))
+        if bad:
+            errors.append(f"web/chapter_eras.json 배정 불일치 {len(bad)}장 (예: {bad[:5]})")
+        web_msgs.append(f"장→시대 {len(w_map)}개 일치")
+    if "era_regions" in web and reg:
+        w_feats = web["era_regions"]["features"]
+        if len(w_feats) != len(reg["features"]):
+            errors.append(f"web/geo/era_regions.json Feature {len(w_feats)}개 — "
+                          f"derived 는 {len(reg['features'])}개")
+        if len(w_feats) != 68:
+            errors.append(f"web/geo/era_regions.json Feature {len(w_feats)}개 — 68 이어야 한다")
+        d_pairs = sorted((f["properties"]["era"], f["properties"]["polity_ko"])
+                         for f in reg["features"])
+        w_pairs = sorted((f["properties"]["era"], f["properties"]["polity_ko"])
+                         for f in w_feats)
+        if d_pairs != w_pairs:
+            errors.append("web/geo/era_regions.json 의 (era, polity_ko) 목록이 derived 와 다르다")
+        for f in w_feats:
+            pr = f["properties"]
+            if pr.get("render") == "blob" and "rep" not in pr:
+                errors.append(f"web/geo/era_regions: {pr.get('polity_ko')} blob 인데 rep 가 없다")
+        web_msgs.append(f"era_regions Feature {len(w_feats)}개")
+
     # 4) 출력
     print("=== Spike 03 시대 데이터 검증 ===")
     print(f"시대 수            : {len(eras['eras'])}  ({', '.join(era_by_id)})")
@@ -142,6 +212,8 @@ def main():
     print(f"render             : blob {render_count['blob']}개 / label_only {render_count['label_only']}개"
           f"  (합계 {sum(render_count.values())})")
     print(f"era_regions.json   : {reg_msg or '없음(건너뜀)'}")
+    print(f"web/data 시대 3종  : {' · '.join(web_msgs) if web_msgs else '없음'}"
+          f"  ({len(web)}/3 파일)")
     if misses:
         print("  places.json에 없는 앵커:")
         for eid, ko, name in misses:
@@ -155,7 +227,8 @@ def main():
         for e in errors:
             print(f"  x {e}")
     print()
-    ok = not errors and assigned == total_chapters == 1189 and not misses
+    ok = (not errors and assigned == total_chapters == 1189 and not misses
+          and len(web) == 3)
     print("결과: " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
