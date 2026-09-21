@@ -116,7 +116,7 @@ html { overflow-x: hidden; }
 
 .ghost:focus-visible, .place:focus-visible, .fab:focus-visible, .zbtn:focus-visible,
 .loc:focus-visible, .bk:focus-visible, .num:focus-visible, .kchip:focus-visible,
-.pick-x:focus-visible, .pick-back:focus-visible {
+.pick-x:focus-visible, .pick-back:focus-visible, .pick-whole:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -730,6 +730,9 @@ body.resizing .panel-map { cursor: col-resize; }
   border-color: var(--accent);
 }
 
+/* `N장 처음부터 보기` — 모바일 3단계에서만 보인다. 데스크톱은 `Enter` 가 그 길이다. */
+.pick-whole { display: none; }
+
 .pick-empty, .pick-hint {
   font-size: 13px;
   line-height: 1.6;
@@ -845,6 +848,23 @@ body.resizing .panel-map { cursor: col-resize; }
   .picker[data-step="2"] .pick-colwrap[data-col="2"],
   .picker[data-step="3"] .pick-colwrap[data-col="3"] { display: flex; }
   .pick-colhead { display: none; }
+  .picker[data-step="3"] .pick-whole {
+    display: block;
+    flex: 0 0 auto;
+    align-self: flex-start;
+    font: inherit;
+    font-size: 13px;
+    color: var(--accent);
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    padding: 6px 4px;
+    margin-bottom: 4px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .picker[data-step="3"] .pick-whole[hidden] { display: none; }
   .pick-col { flex: 1 1 auto; max-height: none; min-height: 0; -webkit-overflow-scrolling: touch; }
   .pick-nums { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px; }
   .num { height: 40px; font-size: 14px; }

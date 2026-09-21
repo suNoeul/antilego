@@ -9,8 +9,8 @@
 지명을 탭하면 읽던 자리에서 양식화된 미니맵이 펼쳐진다.
 
 궤적: 데이터 → 프로토타입(한 장) → UI 없는 코어 라이브러리+CLI → 웹 → 에이전트 플러그인(MCP) → 모바일 앱.
-현재 단계: **Spike 06 배포(2026-09-21) — Codex 리뷰 15건 중 12건 반영. 친구 공유 가능**
-라이브: https://sunoeul.github.io/antilego/  결과: `spikes/05-feedback/RESULT.md` (05-a API · 05-b UI), `spikes/04-picker/RESULT.md`, `spikes/02-map-panel/RESULT.md` (02 · 02-b · 02-c), `spikes/03-eras/RESULT.md`, `spikes/01-web-prototype/RESULT.md`
+현재 단계: **Spike 07-a 배포(2026-09-22) — 성경 찾기: 장 클릭은 선택만, 절 클릭(또는 Enter)에서 이동**
+라이브: https://sunoeul.github.io/antilego/  결과: `spikes/07-picker-verse-nav/RESULT.md`, `spikes/05-feedback/RESULT.md` (05-a API · 05-b UI), `spikes/04-picker/RESULT.md`, `spikes/02-map-panel/RESULT.md` (02 · 02-b · 02-c), `spikes/03-eras/RESULT.md`, `spikes/01-web-prototype/RESULT.md`
 
 ## 두 공간
 

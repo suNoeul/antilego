@@ -597,6 +597,10 @@ function bindGrip() {
 // 성경 찾기 (Spike 04) — 권·장·절 하나의 UI 로. 상단바의 셀렉트 두 개를 대신한다.
 // 데스크톱(≥900px)은 상단바 아래 팝오버 3열, 그 아래는 전체 화면 시트 3단계.
 // 해시 문법(#Book.ch/<placeId>)은 건드리지 않는다 — 절로 가는 것은 스크롤 + 2초 표시다.
+//
+// 07-a (2026-09-22, Snow): **장을 눌러도 옮기지 않는다.** 권 → 장 → 절을 다 고르고
+// 절을 눌렀을 때 화면이 한 번 바뀐다. 장만 보고 싶으면 `Enter`(데스크톱) 또는
+// `N장 처음부터 보기`(모바일) — 그 장 1절로 옮기고 피커를 닫는다.
 // ===========================================================================
 
 const PICK_WIDE = () => window.innerWidth >= 900;
@@ -668,6 +672,7 @@ const pick = {
   ch: null,        // 절 열이 보여 주는 장 (선택)
   v: null,         // 질의가 가리키는 절
   nv: 0,           // pick.ch 의 절 수 (0 = 아직 모름)
+  verr: false,     // 절 수를 못 받았다 (07-a)
   cho: null,       // 모바일 초성 칩
   step: 1,         // 모바일 단계 1=권 2=장 3=절
   list: [],        // 필터된 권 목록
@@ -676,6 +681,7 @@ const pick = {
 };
 
 // 장별 절 수 캐시. 지금 읽는 장은 이미 받아 둔 state.data 를 그대로 쓴다.
+// 못 받으면 **-1** 을 돌려준다 (0 = 아직 안 고름과 구별해야 한다). 실패는 캐시하지 않는다.
 const vcount = new Map();
 async function verseCount(book, ch) {
   if (!book || !ch) return 0;
@@ -691,7 +697,7 @@ async function verseCount(book, ch) {
     const n = (d.verses || []).length;
     vcount.set(key, n);
     return n;
-  } catch { return 0; }
+  } catch { return -1; }
 }
 
 // --- 절로 가기. 해시는 그대로 두고 스크롤 + 2초 표시. ---
@@ -799,8 +805,14 @@ function renderChapters() {
 }
 function renderVerses() {
   const b = pick.book && bookOf(pick.book);
-  $('head-v').textContent = b && pick.ch ? b.ko + ' ' + pick.ch + '장' : '';
-  numGrid($('col-v'), pick.book && pick.ch ? pick.nv : 0, pick.v, '장을 고르세요');
+  const picked = !!(b && pick.ch);
+  $('head-v').textContent = picked ? b.ko + ' ' + pick.ch + '장' : '';
+  // 모바일 3단계의 `N장 처음부터 보기`. 절 수를 못 받아도 이 길은 열어 둔다.
+  const whole = $('pick-whole');
+  whole.hidden = !picked;
+  whole.textContent = picked ? pick.ch + '장 처음부터 보기' : '';
+  const hint = picked && pick.verr ? '절 목록을 불러오지 못했습니다' : '장을 고르세요';
+  numGrid($('col-v'), picked ? pick.nv : 0, pick.v, hint);
 }
 
 function renderChips() {
@@ -847,8 +859,9 @@ async function refreshVerses() {
   const my = ++vseq;
   const n = await verseCount(pick.book, pick.ch);
   if (my !== vseq) return;
-  pick.nv = n;
-  if (pick.v && pick.v > n) pick.v = null;
+  pick.verr = n < 0;
+  pick.nv = n < 0 ? 0 : n;
+  if (pick.v && pick.v > pick.nv) pick.v = null;
   if (pick.open) renderVerses();
 }
 
@@ -860,20 +873,35 @@ function setBook(id, { step = false } = {}) {
   pick.ch = id === state.book ? state.ch : null;
   pick.v = null;
   pick.nv = 0;
+  pick.verr = false;
   if (step && !PICK_WIDE()) pick.step = 2;
   renderPicker();
   if (pick.ch) refreshVerses();
 }
 
+// 장을 고른다 — **옮기지 않는다** (07-a). 절 열만 채우고 모바일은 절 단계로 넘어간다.
 function chooseChapter(n) {
   if (!pick.book) return;
   pick.ch = n;
   pick.v = null;
   pick.nv = 0;
+  pick.verr = false;
   if (!PICK_WIDE()) pick.step = 3;
-  go(pick.book, n, null);          // 바로 옮긴다. 피커는 열린 채로 둔다
   renderPicker();
   refreshVerses();
+  // 다시 그리면서 누른 버튼이 사라진다. 방금 고른 장에 포커스를 돌려줘야
+  // 바로 이어지는 `Enter` 가 그 장으로 간다 (장만 보는 길).
+  if (PICK_WIDE()) $('col-ch').querySelector('.num[aria-selected="true"]')?.focus();
+}
+
+// 장만 고르고 끝내는 길 — 그 장 1절로 옮기고 닫는다.
+// 데스크톱은 장 격자에서 `Enter`, 모바일은 `N장 처음부터 보기` 가 여기로 온다.
+function goChapterStart() {
+  if (!pick.book || !pick.ch) return;
+  const same = state.book === pick.book && state.ch === pick.ch;
+  go(pick.book, pick.ch, null);
+  if (same) window.scrollTo(0, 0);   // 이미 그 장이면 해시가 그대로다 — 맨 위로만 올린다
+  closePicker();
 }
 
 function chooseVerse(n) {
@@ -883,22 +911,30 @@ function chooseVerse(n) {
   closePicker();
 }
 
-// 입력줄의 Enter. 권만 → 1장 · 권+장 → 그 장 · 절까지 → 그 장 + 절로 스크롤 후 닫기.
+// 입력줄·권 목록의 Enter.
+//   `삿 9:3` → 그 장 + 3절로 스크롤 후 닫기
+//   `삿 9`   → 그 장(1절)로 옮기고 닫기 — 장을 **적어서** 가리켰으니 적용이다
+//   `삿`     → 그 권을 고르기만 하고 장 격자로 포커스를 넘긴다 (옮기지 않는다, 07-a)
 function applyQuery() {
   const b = pick.list[pick.hi] || (pick.book && bookOf(pick.book));
   if (!b) return;
+  const typed = pick.q.ch != null;
   const ch = Math.min(Math.max(1, pick.q.ch || 1), b.chapters);
+  const changedBook = pick.book !== b.id;
   pick.book = b.id;
-  pick.ch = ch;
+  pick.ch = typed ? ch : (changedBook ? (b.id === state.book ? state.ch : null) : pick.ch);
   if (pick.q.v) {
     closePicker();
     navVerse(b.id, ch, pick.q.v);
     return;
   }
-  go(b.id, ch, null);
-  if (!PICK_WIDE()) pick.step = 3;
+  if (typed) { goChapterStart(); return; }
+  pick.v = null;
+  pick.nv = 0;
+  pick.verr = false;
+  if (!PICK_WIDE()) pick.step = 2;
   renderPicker();
-  refreshVerses();
+  if (pick.ch) refreshVerses();
   ($('col-ch').querySelector('.num[tabindex="0"]') || $('col-ch').querySelector('.num'))?.focus();
 }
 
@@ -919,6 +955,7 @@ function openPicker() {
   pick.ch = state.ch;
   pick.v = null;
   pick.nv = 0;
+  pick.verr = false;
   pick.cho = null;
   pick.step = 1;
   pick.q = { text: '', ch: null, v: null };
@@ -996,6 +1033,7 @@ function bindPicker() {
   });
 
   $('picker').addEventListener('click', e => {
+    if (e.target.closest?.('#pick-whole')) { goChapterStart(); return; }
     const bk = e.target.closest?.('.bk');
     if (bk) { setBook(bk.dataset.id, { step: true }); return; }
     const num = e.target.closest?.('.num');
@@ -1027,6 +1065,16 @@ function bindPicker() {
     if (e.key === 'Enter' && $('col-book').contains(e.target)) {
       e.preventDefault();
       applyQuery();
+      return;
+    }
+    // 장 격자의 Enter — 고른 장 1절로 옮기고 닫는다 (07-a, 장만 보는 길).
+    // preventDefault 로 버튼의 기본 활성화(= click)를 막아야 chooseChapter 가 겹치지 않는다.
+    if (e.key === 'Enter' && $('col-ch').contains(e.target)) {
+      e.preventDefault();
+      const n = +(e.target.closest?.('.num')?.dataset.n) || pick.ch;
+      if (!n) return;
+      pick.ch = n;
+      goChapterStart();
     }
   });
 
@@ -1420,7 +1468,7 @@ async function boot() {
     setEraLayer, renderEra, eraOf, regionsOf,
     setPanelW, saveW, panelMax, relayout, mapSize, scene,
     // 성경 찾기 (Spike 04)
-    pick, openPicker, closePicker, renderPicker, rebuildList,
+    pick, openPicker, closePicker, renderPicker, rebuildList, goChapterStart,
     parseQuery, matchBook, koPrefix, choOf, scrollToVerse, verseCount,
     // 피드백 (Spike 05-b)
     fb, openFb, closeFb, fbLocText, fbVerse, fbDevice, fbCopyText, fbSetLoc, FEEDBACK_URL,
