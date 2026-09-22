@@ -1,0 +1,80 @@
+{
+ "_readme": {
+  "what": "Spike 08-a — 영문 역본(KJV·BSB)에서 지명을 찾을 때 쓸, 손으로 확인한 표기.",
+  "why": "OpenBible friendly_id + translation_name_counts + TIPNR 로 못 덮는 두 경우를 메운다. (1) 역본이 쓰는 표기가 어느 소스에도 없다 (KJV `gate of the fountain`). (2) 한 낱말짜리 이름인데 그 낱말의 소문자꼴이 본문에서 보통명사로 쓰여 자동 거르개가 버렸다 (Beer · Shittim · On · No · Put · Sin · Ephah · Madmen).",
+  "names": "보통처럼 쓴다 — 대소문자 그대로 먼저 찾고, 그 장소를 그 절에서 하나도 못 찾았을 때만 대소문자를 무시해 한 번 더 찾는다.",
+  "names_cs": "**대소문자를 그대로만** 맞춘다. 소문자꼴이 보통명사인 이름에 쓴다 (본문의 `put`·`beer`·`no` 를 지명으로 잘못 긋지 않게).",
+  "rule": "OpenBible 이 그 장소로 나열한 절에서만 찾는다. 그래서 여기 적은 이름의 위험은 그 절 목록 안으로 한정된다 — 아래 why 는 그 절들을 직접 읽고 쓴 것이다.",
+  "checked": "2026-09-22 (KJV eng-kjv2006 · BSB engbsb)"
+ },
+ "a2fc4c4": {
+  "en": "Fountain Gate",
+  "names": ["Gate of the Fountain"],
+  "why": "KJV 느 2:14·3:15 `the gate of the fountain`. BSB 는 `the Fountain Gate` 로 자동 매칭된다"
+ },
+ "a4eb961": {
+  "en": "Gate of the Guard",
+  "names": ["Prison Gate"],
+  "why": "KJV 느 12:39 `the prison gate` (BSB `the Gate of the Guard`)"
+ },
+ "a057d59": {
+  "en": "King’s Highway",
+  "names": ["King’s high way"],
+  "why": "KJV 민 20:17·21:22 `the king’s high way` (한 낱말이 아니라 띄어 쓴다)"
+ },
+ "a656cb6": {
+  "en": "Beer 1",
+  "names_cs": ["Beer"],
+  "why": "민 21:16 KJV·BSB 둘 다 `to Beer`. 소문자 `beer` 가 본문에 있어 자동 거르개가 버렸다"
+ },
+ "a520374": {
+  "en": "Beer 2",
+  "names_cs": ["Beer"],
+  "why": "삿 9:21 KJV·BSB 둘 다 `to Beer`"
+ },
+ "a73a74f": {
+  "en": "Madmen",
+  "names_cs": ["Madmen"],
+  "why": "렘 48:2 KJV `O Madmen` · BSB `O people of Madmen`. 소문자 `madmen` 과 구별해야 한다"
+ },
+ "ac25afc": {
+  "en": "Ephah",
+  "names_cs": ["Ephah"],
+  "why": "사 60:6 `Midian and Ephah`. 소문자 `ephah` 는 부피 단위라 대문자만 본다"
+ },
+ "af64fb3": {
+  "en": "Shittim",
+  "names_cs": ["Shittim"],
+  "why": "민 25:1 · 수 2:1 · 수 3:1 · 미 6:5 KJV·BSB 둘 다 `Shittim`. 소문자 `shittim wood`(조각목)와 구별"
+ },
+ "acd9137": {
+  "en": "Heliopolis",
+  "names_cs": ["On"],
+  "why": "창 41:45·41:50·46:20 `priest of On` · 겔 30:17 BSB `young men of On`. 대문자만 — 문장 앞의 `On` 위험을 알고 있고, 이 다섯 절에는 없다"
+ },
+ "a9674fc": {
+  "en": "Thebes",
+  "names_cs": ["No"],
+  "why": "KJV 렘 46:25 `the multitude of No` · 겔 30:14–16 · 나 3:8 `populous No`. BSB 는 `Thebes` 로 자동 매칭된다"
+ },
+ "aa32a17": {
+  "en": "Pelusium",
+  "names_cs": ["Sin"],
+  "why": "KJV 겔 30:15–16 `upon Sin` `Sin shall have great pain` (BSB `Pelusium`)"
+ },
+ "ad0520f": {
+  "en": "Put",
+  "names_cs": ["Put"],
+  "why": "BSB 사 66:19 · 렘 46:9 · 겔 27:10·30:5·38:5 · 나 3:9 `Put`. KJV 는 `Phut`·`Pul`·`Libya`. 동사 `put` 과 구별해야 하므로 대문자만"
+ },
+ "af58391": {
+  "en": "Tower of Hananel",
+  "names": ["Tower of Hananeel"],
+  "why": "KJV 느 3:1·12:39, 렘 31:38 `the tower of Hananeel` (e 가 하나 더 있다)"
+ },
+ "a50eea4": {
+  "en": "Tower of the Hundred",
+  "names": ["Tower of Meah"],
+  "why": "KJV 느 3:1·12:39 `the tower of Meah`"
+ }
+}

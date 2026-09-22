@@ -29,6 +29,9 @@ sys.path.insert(0, str(SPIKE00))
 import krv  # noqa: E402  (Spike 00 의 개역한글 로더를 그대로 재사용)
 import build_geo  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "spikes" / "08-versions"))
+import versions as versions_mod  # noqa: E402  (Spike 08-a 의 영문 역본 빌더)
+
 RAW = ROOT / "data" / "raw"
 DERIVED = ROOT / "data" / "derived"
 WEB_DATA = ROOT / "web" / "data"
@@ -167,17 +170,41 @@ ATTRIBUTION_SOURCES = [
 ]
 ATTRIBUTION_LEGACY = [
     "성경전서 개역한글판 © 대한성서공회",
+    "King James Version (public domain)",
+    "Berean Standard Bible (public domain)",
     "Place data: OpenBible.info Bible Geocoding (CC BY 4.0)",
     "Proper names: STEPBible TIPNR (CC BY 4.0)",
     "Basemap: Natural Earth (public domain)",
 ]
+# 영문 역본 두 종 (08-a). 개역한글 바로 뒤에 온다.
+ATTRIBUTION_SOURCES[1:1] = [
+    {
+        "text": "King James Version",
+        "author": "eBible.org (eng-kjv2006, 1769 standardized text)",
+        "url": "https://ebible.org/find/details.php?id=eng-kjv2006",
+        "license": "public domain",
+        "license_url": None,
+        "changes": "USFX → 절 단위 본문 · 각주 제외 · 단락 기호(¶) 제거",
+    },
+    {
+        "text": "Berean Standard Bible",
+        "author": "BSB Publishing, LLC (eBible.org engbsb)",
+        "url": "https://ebible.org/find/details.php?id=engbsb",
+        "license": "public domain",
+        "license_url": None,
+        "changes": "USFX → 절 단위 본문 · 각주 제외",
+    },
+]
 
 # web/data/ 에 반드시 있어야 하는 최상위 파일 (빌드 끝에 확인한다 — F4)
 EXPECTED_FILES = [
-    "index.json", "places.json", "attribution.json",
+    "index.json", "places.json", "attribution.json", "versions.json",
     "eras.json", "chapter_eras.json",
     "geo/land.json", "geo/lakes.json", "geo/rivers.json", "geo/meta.json",
     "geo/era_regions.json",
+    # 역본 축 (08-a) — 역본마다 첫 장이 제자리에 있는지 본다
+    "krv/books/Gen/1.json", "kjv/books/Gen/1.json", "bsb/books/Gen/1.json",
+    "krv/books/Rev/22.json", "kjv/books/Rev/22.json", "bsb/books/Rev/22.json",
 ]
 
 
@@ -370,10 +397,10 @@ def resolve_overlaps(cands):
 
 # --------------------------------------------------------------------- 산출물 검증
 
-def read_emitted_text():
-    """방금 쓴 web/data/books/*/*.json 을 다시 읽어 {osisID: text} 로 편다."""
+def read_emitted_text(ver="krv"):
+    """방금 쓴 web/data/{ver}/books/*/*.json 을 다시 읽어 {osisID: text} 로 편다."""
     out = {}
-    for path in sorted((WEB_DATA / "books").rglob("*.json")):
+    for path in sorted((WEB_DATA / ver / "books").rglob("*.json")):
         obj = json.loads(path.read_text(encoding="utf-8"))
         b, c = obj["book"], obj["chapter"]
         for v in obj["verses"]:
@@ -381,15 +408,18 @@ def read_emitted_text():
     return out
 
 
-def verify_text(raw):
+def verify_text(raw, ver="krv", label="본문"):
     """본문 무수정 보장 (F5). 하나라도 어긋나면 빌드를 실패시킨다.
 
-    1. 절 키 집합이 원본과 정확히 같다 (31,102개)
+    1. 절 키 집합이 원본(로더가 읽은 것)과 정확히 같다 (개역한글 31,102개)
     2. 절마다 문자열이 원본과 **완전히 같다** (strip·정규화 없음)
     3. 모든 문자가 BMP 안에 있다 → 파이썬 인덱스 == JS(UTF-16) 인덱스
     4. 원본 해시 == 산출물 해시 (같은 포맷)
+
+    영문 역본(08-a)도 같은 검사를 받는다. 다만 "원본"은 USFX 파일 자체가 아니라
+    `versions.parse_usfx()` 가 만든 절 사전이다 — 산출물과 **다시 읽은 값**이 같은지 본다.
     """
-    emitted = read_emitted_text()
+    emitted = read_emitted_text(ver)
     problems = []
     missing = sorted(set(raw) - set(emitted))
     extra = sorted(set(emitted) - set(raw))
@@ -408,11 +438,50 @@ def verify_text(raw):
     if h_raw != h_out:
         problems.append("해시 불일치")
     print()
-    print(f"본문 해시 원본   (sha256, {len(raw):,}절): {h_raw}")
-    print(f"본문 해시 산출물 (sha256, {len(emitted):,}절): {h_out}")
-    print(f"본문 무수정 검사: {'OK' if not problems else 'FAIL'}"
+    print(f"{label} 해시 원본   (sha256, {len(raw):,}절): {h_raw}")
+    print(f"{label} 해시 산출물 (sha256, {len(emitted):,}절): {h_out}")
+    print(f"{label} 무수정 검사: {'OK' if not problems else 'FAIL'}"
           f"  (절 {len(emitted):,} · BMP 전용 · 원본 == 산출물)")
     for msg in problems:
+        print(f"  x {msg}")
+    return problems
+
+
+def verify_mentions(vers):
+    """밑줄 검사 (08-a). 역본마다 산출물을 다시 읽어 span 이 말이 되는지 본다.
+
+    1. 0 <= s < e <= len(text)   (JS 가 그대로 slice 한다)
+    2. 한 절 안에서 겹치지 않고 s 오름차순
+    3. p 가 places.json 에 있다   (없으면 UI 가 카드를 못 그린다)
+    4. 장의 places[].n 합 == 그 장의 mention 수
+    """
+    place_ids = set(json.loads((WEB_DATA / "places.json").read_text(encoding="utf-8")))
+    problems, total = [], 0
+    for ver in vers:
+        n_ment = 0
+        for path in sorted((WEB_DATA / ver / "books").rglob("*.json")):
+            obj = json.loads(path.read_text(encoding="utf-8"))
+            counted = Counter()
+            for v in obj["verses"]:
+                t, prev = v["text"], 0
+                for m in v.get("mentions", []):
+                    n_ment += 1
+                    counted[m["p"]] += 1
+                    where = f"{obj['book']}.{obj['chapter']}.{v['v']}"
+                    if not (0 <= m["s"] < m["e"] <= len(t)):
+                        problems.append(f"{ver} {where}: span 범위 밖 {m['s']}–{m['e']}")
+                    elif m["s"] < prev:
+                        problems.append(f"{ver} {where}: span 이 겹치거나 뒤섞임")
+                    prev = m["e"]
+                    if m["p"] not in place_ids:
+                        problems.append(f"{ver} {where}: places.json 에 없는 장소 {m['p']}")
+            listed = {p["p"]: p["n"] for p in obj["places"]}
+            if listed != dict(counted):
+                problems.append(f"{ver} {obj['book']} {obj['chapter']}장: places[] 합계 불일치")
+        total += n_ment
+    print(f"밑줄 검사: {'OK' if not problems else 'FAIL'}  "
+          f"(역본 {len(vers)}종 · span {total:,}개 · 범위·겹침·장소·장 합계)")
+    for msg in problems[:10]:
         print(f"  x {msg}")
     return problems
 
@@ -498,10 +567,10 @@ def main():
         for _s, _e, pid in kept:
             place_total[pid] += 1
 
-    # --- 장별 JSON
+    # --- 장별 JSON (08-a: 개역한글은 web/data/krv/books/ 로 옮겼다. 역본마다 한 칸씩)
     if WEB_DATA.exists():
         shutil.rmtree(WEB_DATA)
-    (WEB_DATA / "books").mkdir(parents=True)
+    (WEB_DATA / "krv" / "books").mkdir(parents=True)
 
     by_chapter = defaultdict(list)
     for osis, t in text.items():
@@ -514,7 +583,7 @@ def main():
 
     total_bytes = 0
     for b in krv.OSIS_BOOKS:
-        bdir = WEB_DATA / "books" / b
+        bdir = WEB_DATA / "krv" / "books" / b
         bdir.mkdir(parents=True, exist_ok=True)
         for c in range(1, chapters_of[b] + 1):
             verses = sorted(by_chapter[(b, c)])
@@ -555,6 +624,21 @@ def main():
         places[pid] = {"ko": km["ko"], "en": info["en"],
                        "lat": round(info["lat"], 5), "lon": round(info["lon"], 5),
                        "n": n, "conf": km["confidence"]}
+
+    # --- 영문 정적 역본 (08-a). places.json 을 쓰기 전에 돌린다 — alt_en 을 여기서 받는다.
+    print("영문 역본 만드는 중 (KJV · BSB) …")
+    ver = versions_mod.build(WEB_DATA, ob, places.keys(), krv.OSIS_BOOKS)
+    # alt_en = 영문 역본 본문에서 **실제로 이 장소로 밑줄이 그어진 표기** 중 en 과 다른 것.
+    # 다른 장소의 대표 이름이기도 한 표기(예루살렘의 `Zion`, 애굽의 `Nile`)는 뺀다 — 혼동한다.
+    other_names = {versions_mod.DISAMB.sub("", p["en"]).strip().lower() for p in places.values()}
+    for pid, seen_names in ver["alt_en"].items():
+        mine = versions_mod.DISAMB.sub("", places[pid]["en"]).strip().lower()
+        alt = [n for n in seen_names
+               if n != places[pid]["en"]
+               and (n.lower() == mine or n.lower() not in other_names)]
+        if alt:
+            places[pid]["alt_en"] = alt
+
     (WEB_DATA / "places.json").write_text(
         json.dumps(places, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
         encoding="utf-8")
@@ -589,7 +673,22 @@ def main():
           f"언급 {sum(n for p, n in skipped_no_ko.items() if p in suppressed):,}")
     print(f"  좌표 없어 제외:            장소 {len(skipped_no_coord):,} · 언급 {sum(skipped_no_coord.values()):,}")
     print(f"  조사 제거 재시도로 찾음:    장소 {len(used_josa_fallback):,} · 언급 {sum(used_josa_fallback.values()):,}")
-    print(f"places.json   {len(places):,} 곳   좌표 없는 장소(전체) {len(no_coord):,}")
+    print(f"places.json   {len(places):,} 곳   좌표 없는 장소(전체) {len(no_coord):,}   "
+          f"alt_en 붙은 곳 {sum(1 for p in places.values() if p.get('alt_en')):,}")
+    print("-" * 66)
+    for vid in sorted(ver["versions"]):
+        s = ver["versions"][vid]
+        print(f"{vid.upper():4s} 절 {s['n_verses']:,} · 장 {s['n_chapters']:,} · "
+              f"장소 {s['n_places']:,} · 밑줄 {s['n_mentions']:,} "
+              f"(겹쳐서 버림 {s['n_dropped_overlap']:,} · 대소문자 무시 {s['n_ci_fallback']:,})")
+        print(f"     찾음 {s['located']:,}/{s['listed']:,} "
+              f"({s['located']/max(s['listed'],1):.1%})   "
+              f"이름으로 불린 절만 {s['located_named']:,}/{s['listed_named']:,} "
+              f"({s['located_named']/max(s['listed_named'],1):.1%})   "
+              f"본문에 없는 절 {s['missing_verse']:,}")
+    print(f"보통명사로 걸러낸 한 낱말 이름 {len(ver['common_dropped'])}개: "
+          f"{' '.join(ver['common_dropped'])}")
+    print("-" * 66)
     print(f"web/data/     파일 {n_files:,}개 · {web_bytes:,} B ({web_bytes/1024/1024:.2f} MB)")
     print(f"geo           tol={geo['tolerance']}  " +
           "  ".join(f"{k}={v:,}B" for k, v in sorted(geo["sizes"].items())))
@@ -622,8 +721,24 @@ def main():
     }, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"상세 리포트: {work / 'spike01_report.json'}")
 
+    # 역본 축 상세 (08-a) — 못 찾은 이름 순위까지
+    (work / "spike08_versions_report.json").write_text(json.dumps({
+        "common_dropped": ver["common_dropped"],
+        "versions": {vid: {
+            **{k: v for k, v in s.items() if k not in ("unlocated", "unlocated_named")},
+            "unlocated_top": [
+                {"p": pid, "en": ob[pid]["en"], "ko": places[pid]["ko"], "n": n,
+                 "n_named": s["unlocated_named"][pid]}
+                for pid, n in s["unlocated"].most_common(60)],
+        } for vid, s in ver["versions"].items()},
+    }, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"역본 리포트: {work / 'spike08_versions_report.json'}")
+
     # --- 무결성 검사 (F5 본문 무수정 · F4 완료 검사). 하나라도 어긋나면 빌드 실패.
-    problems = verify_text(raw_text_strings())
+    problems = verify_text(raw_text_strings(), "krv", "개역한글")
+    for vid in sorted(ver["texts"]):
+        problems += verify_text(ver["texts"][vid], vid, vid.upper())
+    problems += verify_mentions(["krv"] + sorted(ver["texts"]))
     problems += verify_files()
     if problems:
         print("\n빌드 실패 — 위 문제를 고치기 전에는 web/data/ 를 쓰지 않는다.")

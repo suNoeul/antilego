@@ -45,7 +45,7 @@
 
 | 누가 | 어디 | 무엇 | 시작 |
 |---|---|---|---|
-| — | — | — | — |
+| Opus (08-a) | `spikes/08-versions/**` · `spikes/01-web-prototype/build.py` · `data/derived/alt_names_en.json` · `web/data/**` · `docs/03-prototype-spec.md`(데이터 스키마) | Spike 08-a 역본 축 데이터 — KJV·BSB 정적 본문 + 영어 지명 밑줄, 개역한글을 `web/data/krv/books/` 로 이동 — 커밋 완료, 푸시는 코디네이터 (끝나면 이 줄 지운다) | 2026-09-22 |
 
 ## 디렉토리
 

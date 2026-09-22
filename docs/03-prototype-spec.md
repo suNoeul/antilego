@@ -196,6 +196,107 @@ python3 spikes/03-eras/export_web.py     # 의존성 없음. 멱등
   1,189개가 `data/derived` 와 한 장도 빠짐없이 같은지, Feature 68개인지, blob 마다 `rep` 가
   있는지. 셋 중 하나라도 없으면 FAIL.
 
+### 역본 축 (Spike 08-a, 2026-09-22) — `versions.json` · `{ver}/books/…`
+
+읽는 역본을 고를 수 있게 데이터에 축을 하나 더 뒀다. **장 스키마는 바뀌지 않는다** — 역본마다
+같은 모양의 `books/` 가 하나씩 있을 뿐이다.
+
+```
+web/data/
+  versions.json               역본 목록 (아래)
+  krv/books/{BookId}/{ch}.json   개역한글 — **`books/` 에서 여기로 옮겼다**
+  kjv/books/{BookId}/{ch}.json   King James Version
+  bsb/books/{BookId}/{ch}.json   Berean Standard Bible
+  places.json  index.json  attribution.json  eras.json  chapter_eras.json  geo/   ← 역본과 무관, 공유
+```
+
+UI 는 `${DATA_BASE}${ver}/books/{BookId}/{ch}.json` 을 읽는다. `web/data/books/` 는 더 이상 없다.
+
+#### `versions.json`
+```json
+{ "default": "krv",
+  "versions": [
+    { "id": "krv", "name": "개역한글", "short": "개역한글", "lang": "ko", "type": "static",
+      "attribution": "성경전서 개역한글판 © 대한성서공회" },
+    { "id": "kjv", "name": "King James Version", "short": "KJV", "lang": "en", "type": "static",
+      "attribution": "King James Version (public domain)" },
+    { "id": "bsb", "name": "Berean Standard Bible", "short": "BSB", "lang": "en", "type": "static",
+      "attribution": "Berean Standard Bible (public domain, CC0)" },
+    { "id": "esv", "name": "English Standard Version", "short": "ESV", "lang": "en", "type": "online",
+      "attribution": "Scripture quotations are from the ESV® Bible …, © 2001 by Crossway. Used by permission.",
+      "attribution_url": "https://www.esv.org",
+      "note": "온라인 전용 — 읽을 때마다 ESV API에서 받아옵니다" } ] }
+```
+- `type: "static"` 은 위 경로에 본문이 있다. `type: "online"` 은 **저장소에 본문이 한 글자도 없다** —
+  ESV 는 메타데이터(이름·출처 문구)뿐이고 본문은 읽을 때마다 ESV API 에서 받는다.
+  저작권 있는 역본을 저장소에 넣지 않는다는 규칙(AGENTS.md)의 데이터 쪽 표현이다.
+- 배열 순서가 곧 표시 순서. 정본은 `spikes/08-versions/versions.py` 의 `VERSIONS`.
+
+#### 영문 본문 (KJV · BSB)
+- 원본은 eBible.org 의 USFX (`eng-kjv2006` · `engbsb`), 둘 다 **퍼블릭 도메인**.
+  받는 법은 `bash spikes/08-versions/fetch_versions.sh` (멱등, URL 고정).
+- 절은 `<v …/>` 와 `<ve/>` 사이만 담는다 — 각주 `<f>` · 상호참조 `<x>` · 표제 · 시편 표제는 뺀다.
+  KJV 의 이탤릭 보충어 `<add>` 는 본문의 일부라 **남긴다**. KJV 의 단락 기호 `¶` 는 낱말이 아니라
+  조판 기호라 지운다. 공백은 하나로 접는다.
+- 절 수: KJV 31,102 (개역한글과 같다) · BSB 31,086. BSB 에 없는 16절은
+  마 17:21 · 18:11 · 23:14 · 막 7:16 · 9:44 · 9:46 · 11:26 · 15:28 · 눅 17:36 · 23:17 ·
+  요 5:4 · 행 8:37 · 15:34 · 24:7 · 28:29 · 롬 16:24 — BSB 가 본문에 넣지 않는 사본 이문이다.
+  **그 절은 장 JSON 에 아예 없다** (빈 문자열로 채우지 않는다).
+- `s`,`e` 는 개역한글과 똑같이 JS(UTF-16) 인덱스다. 두 역본 모두 BMP 밖 문자가 없음을 빌드가 검사한다.
+
+#### 영문 밑줄 규칙
+조건 1(OpenBible 이 그 절을 나열함)은 개역한글과 같다. 조건 2만 영어식으로 바꾼다.
+
+1. **이름 목록** — 장소마다 세 소스를 합친다.
+   ① OpenBible `friendly_id` 의 기본형 (`Beer 1` → `Beer`)
+   ② OpenBible `translation_name_counts` 의 키 (역본별 표기가 여기 다 있다 — `Abanah` · `Tyrus`)
+   ③ STEPBible TIPNR 의 영문 표기 (`Kirjath-jearim` · `Sion` · `Kiriath-baal`)
+   ④ `data/derived/alt_names_en.json` — 손으로 확인해 더한 표기
+   KJV 1769 의 합자(`Caesarea` → `Cæsarea`, `Judaea` → `Judæa`)는 자동으로 만들어 붙인다.
+2. **이름꼴 거르개** — 대문자로 시작하면 받는다. 소문자로 시작해도 여러 낱말이고 그중 하나가
+   대문자면 받는다 (KJV `tower of Hananeel` · `wilderness of Sin`). 고유명사가 하나도 없는
+   번역어(`wood` · `stone` · `the fair havens`)는 버린다.
+3. **보통명사 거르개** — 한 낱말짜리 이름인데 그 낱말의 **소문자꼴이 본문에 쓰이면** 버린다.
+   사전 없이 본문 스스로 가려낸다. 지금 걸리는 31개: `Angle Beautiful Beer Cherub East Ephah
+   Foundation Guard Holiest Hollow Iron Lower Madmen Mortar Mount No North On Pavement Plain
+   Proud Put River Sea Shittim Sin Skull South Straight Temple Token`. **여러 낱말 이름 안에서는
+   그대로 산다** — `Salt Sea` 는 남고 `Sea` 만 죽는다. 되살려야 하는 것은
+   `alt_names_en.json` 의 `names_cs`(대소문자를 그대로만 맞춘다)로 하나씩 근거를 적어 넣는다.
+4. **낱말 경계** — 앞뒤가 라틴 글자가 아니어야 하고, **붙임표 합성어의 조각이면 안 된다**:
+   `El-beth-el` 의 `beth-el`, `Mahaneh-dan` 의 `dan`, `Kirjath-jearim` 의 `Kirjath` 는 죽는다.
+   아포스트로피는 경계라 `Jerusalem’s` 에서 `Jerusalem` 만 잡힌다.
+5. **대소문자** — 그대로 먼저 찾고, 그 장소를 그 절에서 하나도 못 찾았을 때만 무시하고 한 번 더
+   찾는다. KJV 행 27:8 `The fair havens` (BSB `Fair Havens`) 가 이 재시도로 잡힌다.
+6. **한 절 · 한 장소 · 한 표기** — 한 절에서 같은 장소의 서로 다른 표기가 여럿 걸리면 대표 이름
+   (없으면 가장 긴 것) 하나만 쓴다. 대상 4:32 `Etam, and Ain, Rimmon, and Tochen, and Ashan` 에서
+   OpenBible 이 Ashan 의 다른 표기로 들고 있는 `Ain` 까지 긋는 걸 막는다. 같은 표기가 한 절에
+   여러 번 나오면 **전부** 긋는다.
+7. **겹침** — 긴 것이 이긴다. 개역한글과 같은 규칙.
+8. 한국어와 달리 **confidence 문턱이 없다** — 이름이 본문 소스(OpenBible·TIPNR)에서 직접 온다.
+   대신 **밑줄을 다는 장소는 `places.json` 에 있는 918곳으로 한정한다**: `p` 가 `places.json` 에
+   없으면 UI 가 카드를 못 그리기 때문. 한국어 이름이 확실하지 않아 빠진 장소는 영문에서도 빠진다.
+
+#### `places.json` 의 `alt_en`
+```json
+{ "a58735e": { "ko": "가이사랴", "en": "Caesarea", "lat": …, "lon": …, "n": …, "conf": …,
+               "alt_en": ["Cæsarea"] } }
+```
+- **영문 역본 본문에서 실제로 이 장소로 밑줄이 그어진 표기** 중 `en` 과 다른 것 (KJV·BSB 합집합).
+  `places.json` 의 918곳 중 512곳에 붙는다.
+- 다른 장소의 대표 이름이기도 한 표기는 뺐다 (예루살렘의 `Zion` — 혼동한다).
+- 표기 그대로라 이명·종족명이 섞인다 (`Jerusalem` → `Jews`, `Egypt` → `Egyptians`).
+  UI 가 보여준다면 "다른 이름"이 아니라 **"역본이 쓴 표기"** 로 적는 게 맞다.
+
+#### 빌드 계약에 더해진 것
+- 진입점은 여전히 `build.py` 하나다. `spikes/08-versions/versions.py` 를 `build_geo` 처럼 부른다.
+- 차례: 본문 → `krv/books/` → `index.json` → **영문 역본(`kjv/` `bsb/` `versions.json`)** →
+  `places.json`(`alt_en` 포함) → `attribution.json` → `geo/` → 시대 3종 → 검증.
+- 검증이 셋 늘었다.
+  ① **역본마다** 본문 해시·재독해 전수 대조·BMP 검사 (개역한글과 같은 포맷으로 둘 다 찍는다).
+  ② **밑줄 검사** — 세 역본의 모든 span 이 `0 ≤ s < e ≤ len(text)`, 한 절 안에서 안 겹치고
+     `s` 오름차순, `p` 가 `places.json` 에 있고, 장의 `places[].n` 합이 mention 수와 같다.
+  ③ 완료 검사에 `versions.json` 과 역본별 첫·끝 장 6개가 들어갔다 (필수 파일 17개).
+
 ## UI 스펙 (B) — Spike 02 개정 (2026-09-18), 02-b 다듬기 (2026-09-18), 02-c 패널 리사이즈 (2026-09-21), 05-b 피드백 (2026-09-21), 06-b 리뷰 반영 (2026-09-21)
 
 Spike 01 의 "데스크톱 사이드 카드 + 모바일 인라인 카드 + 접힌 지도 + 크게 보기 모달"을 전부 버리고
