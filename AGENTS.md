@@ -9,7 +9,7 @@
 지명을 탭하면 읽던 자리에서 양식화된 미니맵이 펼쳐진다.
 
 궤적: 데이터 → 프로토타입(한 장) → UI 없는 코어 라이브러리+CLI → 웹 → 에이전트 플러그인(MCP) → 모바일 앱.
-현재 단계: **Spike 07-a 배포(2026-09-22) — 성경 찾기: 장 클릭은 선택만, 절 클릭(또는 Enter)에서 이동**
+현재 단계: **Spike 08 배포(2026-09-22) — 역본 축: 개역한글·KJV·BSB 정적 + ESV 온라인 전용(키 대기)**
 라이브: https://sunoeul.github.io/antilego/  결과: `spikes/07-picker-verse-nav/RESULT.md`, `spikes/05-feedback/RESULT.md` (05-a API · 05-b UI), `spikes/04-picker/RESULT.md`, `spikes/02-map-panel/RESULT.md` (02 · 02-b · 02-c), `spikes/03-eras/RESULT.md`, `spikes/01-web-prototype/RESULT.md`
 
 ## 두 공간
@@ -45,8 +45,7 @@
 
 | 누가 | 어디 | 무엇 | 시작 |
 |---|---|---|---|
-| Fable (08-b) | `web/*.js` · `web/index.html` · `web/styles.css` · `web/data-fixture/**` · `api/**` · `spikes/08-versions/{verify,shots}` · `docs/03-prototype-spec.md`(UI) | Spike 08-b 역본 선택 UI + ESV 온라인 역본 — 커밋 완료, 배포·`ESV_API_KEY` 설정은 코디네이터 (끝나면 이 줄 지운다) | 2026-09-22 |
-| Opus (08-a) | `spikes/08-versions/**` · `spikes/01-web-prototype/build.py` · `data/derived/alt_names_en.json` · `web/data/**` · `docs/03-prototype-spec.md`(데이터 스키마) | Spike 08-a 역본 축 데이터 — KJV·BSB 정적 본문 + 영어 지명 밑줄, 개역한글을 `web/data/krv/books/` 로 이동 — 커밋 완료, 푸시는 코디네이터 (끝나면 이 줄 지운다) | 2026-09-22 |
+| — | — | — | — |
 
 ## 디렉토리
 
