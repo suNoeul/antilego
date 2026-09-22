@@ -45,6 +45,7 @@
 
 | 누가 | 어디 | 무엇 | 시작 |
 |---|---|---|---|
+| Fable (08-b) | `web/*.js` · `web/index.html` · `web/styles.css` · `web/data-fixture/**` · `api/**` · `spikes/08-versions/{verify,shots}` · `docs/03-prototype-spec.md`(UI) | Spike 08-b 역본 선택 UI + ESV 온라인 역본 — 커밋 완료, 배포·`ESV_API_KEY` 설정은 코디네이터 (끝나면 이 줄 지운다) | 2026-09-22 |
 | Opus (08-a) | `spikes/08-versions/**` · `spikes/01-web-prototype/build.py` · `data/derived/alt_names_en.json` · `web/data/**` · `docs/03-prototype-spec.md`(데이터 스키마) | Spike 08-a 역본 축 데이터 — KJV·BSB 정적 본문 + 영어 지명 밑줄, 개역한글을 `web/data/krv/books/` 로 이동 — 커밋 완료, 푸시는 코디네이터 (끝나면 이 줄 지운다) | 2026-09-22 |
 
 ## 디렉토리

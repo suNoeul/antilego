@@ -38,6 +38,8 @@
   --chip-nt-fg: #8a3b32;
   --pick-shadow: 0 6px 28px rgba(60, 45, 25, .13);
   --serif: "Noto Serif KR", "Apple SD Gothic Neo", serif;
+  /* 영문 역본 본문 (08-b). 한글 세리프를 영문에 쓰면 자간이 헐거워진다 — 시스템 세리프로. */
+  --serif-en: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   /* 지도 패널. --panel-w-user 는 ≥1200px 에서만 쓰인다 (02-c, app.js 가 바꾼다) */
   --panel-w: 400px;
@@ -167,6 +169,106 @@ html { overflow-x: hidden; }
 .ghost:hover { color: var(--ink); background: var(--hl); }
 .ghost[disabled] { opacity: .3; cursor: default; background: none; }
 
+/* --- 역본 버튼 + 메뉴 (Spike 08-b) --- */
+/* 위치 버튼 옆의 작은 글자 버튼. 메뉴는 그 아래 붙는 작은 카드 하나다. */
+.verwrap { position: relative; display: inline-flex; min-width: 0; }
+.verbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 34vw;
+  overflow: hidden;
+}
+.verbtn:hover { color: var(--ink); background: var(--hl-soft); }
+.verbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.verbtn[aria-expanded="true"] { color: var(--ink); border-color: var(--accent); }
+.verbtn[aria-expanded="true"] .loc-chev { transform: rotate(-90deg); }
+#verbtn-text { overflow: hidden; text-overflow: ellipsis; }
+
+/* 피커(60)·피드백(70) 아래, 지도 패널(40)·플로팅 버튼(45) 위. */
+.vermenu {
+  position: absolute;
+  z-index: 58;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 232px;
+  padding: 5px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--pick-shadow);
+}
+.veritem {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+.veritem:hover { background: var(--hl-soft); }
+.veritem:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.veritem[aria-checked="true"] { background: var(--hl); }
+.veritem[aria-checked="true"] .ver-name { color: var(--accent); font-weight: 600; }
+.ver-name { flex: 1 1 auto; min-width: 0; }
+.ver-short { flex: 0 0 auto; font-size: 11px; color: var(--muted); }
+/* 온라인 역본 꼬리표. 글자 하나 더 옅게 — 눈에 띄되 읽기를 방해하지 않는다. */
+.ver-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--muted);
+  opacity: .8;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* 온라인 역본이 닿지 않았을 때 본문 자리에 놓이는 되돌아가기 버튼. */
+.ver-fallback {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+.ver-fallback:hover { background: var(--hl-soft); }
+.ver-fallback:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 폰에서는 상단바에 글자가 하나 더 늘었다 — 위치·역본 둘 다 조금씩 양보한다.
+   메뉴는 버튼 밑에 매달지 않고 화면 폭에 맞춘다. 긴 권 이름(데살로니가전서)이면 버튼이
+   오른쪽으로 밀려 메뉴가 화면 밖으로 나가고, 그만큼 가로 스크롤이 생기기 때문이다. */
+@media (max-width: 599px) {
+  .loc { max-width: 40vw; }
+  .verbtn { max-width: 30vw; padding: 3px 7px; }
+  .vermenu {
+    position: fixed;
+    top: calc(var(--topbar-h) + 6px);
+    left: 8px;
+    right: 8px;
+    min-width: 0;
+  }
+}
+
 /* --- 레이아웃. 본문 한 컬럼뿐이다 --- */
 .cols {
   max-width: 672px;
@@ -184,6 +286,9 @@ html { overflow-x: hidden; }
   margin: 0 0 20px;
 }
 .verses { font-family: var(--serif); font-size: 17px; line-height: 1.9; }
+/* 영문 역본 (08-b). 글꼴만 시스템 세리프로 바꾸고 줄 사이를 조금 좁힌다 (1.9 → 1.7).
+   지명 버튼 모양은 그대로다. */
+.verses.lang-en { font-family: var(--serif-en); line-height: 1.7; }
 .verse { margin: 0 0 1.15em; }
 .vnum {
   font-family: var(--sans);
@@ -238,6 +343,9 @@ html { overflow-x: hidden; }
 }
 .attr a:hover { color: var(--ink); opacity: 1; }
 .attr a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+/* 역본 출처 한 줄 (08-b). 맨 위에 서서 선을 긋고, 아래 줄들은 선 없이 이어 붙는다. */
+.attr .attr-ver:not([hidden]) + #attr-line { border-top: 0; padding-top: 4px; }
 
 /* 피드백 안내 한 줄 (05-b). 출처보다 한 겹 더 옅게, 선은 한 번만 긋는다. */
 .attr .attr-fb {

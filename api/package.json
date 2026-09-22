@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Antilego 피드백 수집 함수 (Vercel). 비상업 전용.",
+  "description": "Antilego 서버 함수 (Vercel) — 피드백 수집 · ESV 본문 프록시. 비상업 전용.",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test": "node test/notion-mock.mjs",
+    "test": "node test/notion-mock.mjs && node test/esv-mock.mjs",
     "dev": "node test/local.mjs"
   }
 }

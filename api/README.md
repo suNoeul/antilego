@@ -1,7 +1,11 @@
-# `api/` — 피드백 수집 함수
+# `api/` — 서버 함수 둘 (피드백 · ESV 본문)
 
-정적 사이트(GitHub Pages)는 비밀을 못 가진다. 그래서 "피드백" 버튼이 보내는 POST 를
-받아 **서버 쪽 토큰으로** Notion DB 에 한 줄 쓰는 함수 하나를 Vercel 에 따로 올린다.
+정적 사이트(GitHub Pages)는 비밀을 못 가진다. 그래서 비밀이 필요한 일만 Vercel 함수로 뺀다.
+
+| 함수 | 하는 일 | 비밀 |
+|---|---|---|
+| `/api/feedback` | "피드백" 버튼의 POST 를 받아 Notion DB 에 한 줄 쓴다 | `NOTION_TOKEN` |
+| `/api/esv` | ESV 한 장을 받아 `{v,text}` 로 갈라 돌려준다 (Spike 08-b) | `ESV_API_KEY` |
 
 - 비상업 전용 (AGENTS.md). Vercel **Hobby** 플랜만 쓴다.
 - 외부 패키지 없음. Node 20+ 의 전역 `fetch` 만 쓴다.
@@ -18,10 +22,12 @@ api/                     ← Vercel 프로젝트 루트 (vercel --cwd api)
 ├── package.json         name: antilego-api, "type": "module"
 ├── vercel.json          regions: ["icn1"], maxDuration 10
 ├── api/
-│   └── feedback.js      ← 함수 하나. /api/feedback 로 뜬다
+│   ├── feedback.js      ← /api/feedback
+│   └── esv.js           ← /api/esv   (Spike 08-b)
 └── test/
-    ├── local.mjs        Vercel 없이 :3300 에 띄우는 어댑터
-    └── notion-mock.mjs  fetch 를 가로채 요청 본문을 검사 (36개)
+    ├── local.mjs        Vercel 없이 :3300 에 띄우는 어댑터 (둘 다 라우팅한다)
+    ├── notion-mock.mjs  fetch 를 가로채 요청 본문을 검사 (36개)
+    └── esv-mock.mjs     ESV 로 나가는 fetch 를 가로채 검사 (33개)
 ```
 
 헷갈리기 쉬운 곳: `api/feedback.js` (루트 바로 아래) 가 아니라 `api/api/feedback.js` 다.
@@ -37,6 +43,7 @@ api/                     ← Vercel 프로젝트 루트 (vercel --cwd api)
 | `NOTION_TOKEN` | 예 | Notion 내부 통합(internal integration)의 토큰 (`ntn_…`). 서버에만 둔다 |
 | `NOTION_DB_ID` | 아니오 | 기본값 `8a563b39-003e-4616-89f4-fb2144f90e4f` (📮 Feedback) |
 | `NOTION_DATA_SOURCE_ID` | 아니오 | **설정하면** `Notion-Version: 2025-09-03` + `parent.data_source_id` 로 갈아탄다. 비워 두면 지금까지 하던 대로 (아래 "Notion API 버전") |
+| `ESV_API_KEY` | `/api/esv` 에만 | ESV API 키. https://api.esv.org 에서 **가입만 하면 무료**로 발급된다 (결제 없음). 없으면 `/api/esv` 가 503 `{"error":"no_key"}` 를 준다 — 피드백 함수는 영향 없다 |
 
 토큰은 응답에도 로그에도 절대 나오지 않는다. 저장 실패 시 로그에 남는 것은 **고정 문구 + HTTP 상태
 코드 + Notion 이 준 `code` 필드**뿐이다 — upstream 응답 본문과 예외 메시지는 찍지 않는다.
@@ -102,7 +109,7 @@ properties · children 은 두 경우가 똑같다. `notion-mock.mjs` 가 양쪽
 
 참고: https://developers.notion.com/docs/upgrade-faqs-2025-09-03
 
-## 요청 · 응답
+## 요청 · 응답 (`/api/feedback`)
 
 `POST /api/feedback`, `Content-Type: application/json`
 
@@ -153,7 +160,7 @@ properties · children 은 두 경우가 똑같다. `notion-mock.mjs` 가 양쪽
 
 ## 레이트 리밋 — best-effort
 
-`x-forwarded-for` 첫 값 기준으로 **1분 5개 · 하루 30개**. 인스턴스 메모리의 `Map` 이라
+`/api/feedback` 은 `x-forwarded-for` 첫 값 기준으로 **1분 5개 · 하루 30개** (`/api/esv` 는 1분 60개). 인스턴스 메모리의 `Map` 이라
 서버리스에서 인스턴스가 여러 개 뜨면 **각각 따로 센다**. 콜드 스타트에도 초기화된다.
 그래서 정확한 방어가 아니라 실수·단순 스팸을 거르는 용도다. 진짜로 막아야 할 일이
 생기면 Vercel WAF 의 rate limit 나 외부 KV 로 옮긴다.
@@ -219,3 +226,86 @@ NOTION_TOKEN=ntn_… node test/local.mjs   # 진짜 Notion 에 쓴다
 
 `MOCK_NOTION=1` 모드는 `web/` 쪽에서 버튼을 붙일 때 쓰면 된다 —
 `http://localhost:3300/api/feedback` 로 쏘면 CORS 도 그대로 확인된다.
+
+
+---
+
+# `/api/esv` — ESV 본문 프록시 (Spike 08-b)
+
+`GET /api/esv?ref=Josh.10` → 그 장의 ESV 본문을 절 단위로 돌려준다.
+
+```json
+{ "ok": true, "ref": "Josh.10",
+  "verses": [ { "v": 1, "text": "…" }, { "v": 2, "text": "…" } ],
+  "notice": "Scripture quotations are from the ESV® Bible … Used by permission. All rights reserved." }
+```
+
+| 코드 | 언제 |
+|---|---|
+| 200 | 받았다 |
+| 400 | `ref` 형식이 틀렸거나 없는 권·범위 밖 장 (`Josh.25`, `Ps.151`, `Foo.1`) |
+| 403 | `Origin` 이 허용 목록 밖 |
+| 405 | GET·OPTIONS 아님 |
+| 429 | 레이트 리밋 (IP 기준 **1분 60개**, best-effort, `Retry-After: 60`) |
+| 502 | ESV 가 거절했거나 닿지 않았다 (고정 문구. 로그에는 **상태 코드만**) |
+| 503 | `{"ok":false,"error":"no_key"}` — 키가 아직 없다 |
+
+`ref` 는 `web/data/index.json` 과 같은 **OSIS id**(`Josh` · `1Sam` · `Ps` · `Phlm` …)와 장 번호다.
+함수 안의 66권 표가 이것을 ESV 질의 이름으로 옮긴다 (`Josh`→`Joshua`, `1Sam`→`1 Samuel`,
+`Ps`→`Psalm`, `Song`→`Song of Solomon`, `Phlm`→`Philemon`). 같은 표가 장 수도 들고 있어서
+범위 밖 장은 **upstream 까지 가지 않고** 400 으로 끊긴다.
+
+## upstream 질의
+
+```
+GET https://api.esv.org/v3/passage/text/?q=Joshua+10
+    &include-headings=false&include-footnotes=false&include-verse-numbers=true
+    &include-short-copyright=false&include-passage-references=false
+    &indent-paragraphs=0&indent-poetry=false&include-first-verse-numbers=true&line-breaks=false
+Authorization: Token $ESV_API_KEY
+```
+
+돌아온 평문은 `[1] … [2] …` 꼴이다. 대괄호 번호를 경계로 잘라 `{v,text}` 로 만들고,
+줄바꿈은 공백 하나로 접는다. 절을 하나도 못 뽑으면 200 으로 빈 본문을 주지 않고 502 로 끝낸다.
+
+## 라이선스와 캐시 — 500절 상한
+
+ESV API 는 **가입만 하면 무료**이고 비상업 용도로 쓸 수 있다 (AGENTS.md: 결제·문의 없음).
+대신 지켜야 할 선이 둘이다.
+
+- **로컬에 500절 넘게 저장하지 않는다.** 그래서
+  - 응답 헤더는 `Cache-Control: private, no-store` — 브라우저·CDN 이 쌓아 두지 못한다.
+  - 함수는 **마지막 3장 · 60초**만 인스턴스 메모리에 둔다. 담긴 절 수를 직접 세어
+    500을 넘으면 오래된 것부터 버린다 (시편 119편 같은 장이 겹칠 때).
+  - `web/` 쪽은 **지금 보고 있는 한 장만** 메모리에 둔다. `localStorage` · IndexedDB 에 넣지 않고,
+    역본을 바꾸거나 장을 옮기면 그 자리에서 사라진다.
+- **하루 5,000 요청.** 한 요청이 한 장이다. IP 기준 1분 60개 리밋이 그 앞을 한 겹 막는다.
+
+고지문은 응답의 `notice` 로 함께 내려보내고, 화면 아래 출처 줄에 그대로 띄운다.
+
+## 키 받기 (Snow)
+
+1. https://api.esv.org 에서 가입 → API 키 발급 (무료, 결제 정보 없음).
+2. `vercel env add ESV_API_KEY production --cwd api` (필요하면 `preview` 도).
+3. 재배포. 키가 없는 동안 화면에는 `ESV API 키가 아직 설정되지 않았습니다` 가 뜨고
+   `개역한글로 보기` 버튼이 함께 나온다 — 다른 역본은 영향을 받지 않는다.
+
+## 확인용 curl
+
+```bash
+API=https://<프로젝트>.vercel.app/api/esv
+
+curl -i "$API?ref=Josh.10" -H 'Origin: https://sunoeul.github.io'
+curl -i "$API?ref=Josh.25"            # → 400
+curl -i -X OPTIONS "$API" -H 'Origin: https://sunoeul.github.io'   # → 204
+```
+
+## 로컬
+
+```bash
+cd api
+node test/esv-mock.mjs             # 33개 검사. 네트워크 안 씀
+MOCK_ESV=1 node test/local.mjs     # :3300. ESV 대신 가짜 지문을 돌려준다 (키 불필요)
+ESV_API_KEY=… node test/local.mjs  # 진짜 ESV 에 붙는다
+npm test                           # notion-mock + esv-mock
+```

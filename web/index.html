@@ -18,6 +18,14 @@
             aria-expanded="false" aria-controls="picker">
       <span id="loc-text"></span><span class="loc-chev" aria-hidden="true">▸</span>
     </button>
+    <!-- 역본 고르기 (Spike 08-b). 역본이 하나뿐이면 통째로 숨는다. -->
+    <span class="verwrap">
+      <button id="verbtn" class="verbtn" type="button" aria-haspopup="menu"
+              aria-expanded="false" aria-controls="vermenu" hidden>
+        <span id="verbtn-text"></span><span class="loc-chev" aria-hidden="true">▸</span>
+      </button>
+      <div id="vermenu" class="vermenu" role="menu" aria-label="역본" hidden></div>
+    </span>
     <button id="btn-prev" class="ghost" type="button" aria-label="이전 장">‹</button>
     <button id="btn-next" class="ghost" type="button" aria-label="다음 장">›</button>
     <span class="grow"></span>
@@ -70,6 +78,8 @@
 </main>
 
 <footer class="attr">
+  <!-- 지금 보고 있는 역본의 출처 한 줄 (08-b). 출처 목록에 이미 같은 줄이 있으면 숨는다. -->
+  <p id="attr-ver" class="attr-ver" hidden></p>
   <p id="attr-line"></p>
   <p class="attr-fb">읽다가 이상하면 오른쪽 '피드백' 버튼을 눌러 주세요.</p>
 </footer>

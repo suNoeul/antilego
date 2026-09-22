@@ -34,7 +34,9 @@ const ls = {
 };
 
 const state = {
-  index: null, places: {}, layers: {}, attr: [],
+  index: null, places: {}, layers: {}, attr: [], attrList: [],
+  // 역본 (Spike 08-b). versions.json 이 없는 배포본은 legacyData=true 로 옛 경로를 읽는다.
+  versions: [], ver: null, legacyData: false, esvNotice: '',
   book: null, ch: null, data: null, sel: null,   // book=null → 첫 apply()에서 무조건 로드
   open: false,                                   // 패널 열림 여부
   panelW: 400,                                   // 패널 폭(02-c). ≥1200px 에서만 바뀐다
@@ -64,6 +66,211 @@ const getJSON = async path => {
   return r.json();
 };
 const bookOf = id => (state.index?.books || []).find(b => b.id === id);
+
+// ===========================================================================
+// 역본 (Spike 08-b) — `versions.json` 하나가 무엇을 읽을지 정한다.
+//
+//   static : 장 파일이 그대로 있다 → `<ver>/books/{Book}/{ch}.json` (스키마는 예전 그대로)
+//   online : 읽을 때마다 우리 Vercel 함수(`/api/esv`)로 받아온다. **저장하지 않는다** —
+//            지금 보고 있는 한 장만 메모리에 둔다 (ESV 라이선스: 로컬 500절 상한).
+//
+// `versions.json` 을 못 받으면 옛 배포본이다. 그때는 역본 버튼을 숨기고 `books/…` 를
+// 예전 그대로 읽는다 — 이 파일 하나 때문에 읽기가 멈추지는 않는다.
+// ===========================================================================
+
+const ESV_URL = 'https://antilego-api.vercel.app/api/esv';
+const ONLINE_TIMEOUT = 10000;
+
+const LEGACY_VER = {
+  id: 'krv', name: '개역한글', short: '개역한글', lang: 'ko', type: 'static',
+  attribution: '성경전서 개역한글판 © 대한성서공회',
+};
+
+const verOf = id => state.versions.find(v => v.id === id) || null;
+const curVer = () => verOf(state.ver) || state.versions[0] || LEGACY_VER;
+// 정적 역본 하나 — 절 수를 세고, 온라인 역본의 지명을 가늠할 때 기준이 된다.
+const staticVer = () => (verOf(state.ver)?.type === 'static' ? verOf(state.ver) : null)
+  || state.versions.find(v => v.type === 'static') || LEGACY_VER;
+const chapterPath = (verId, book, ch) =>
+  (state.legacyData ? '' : verId + '/') + `books/${book}/${ch}.json`;
+
+function initVersions(data) {
+  const list = Array.isArray(data?.versions) ? data.versions.filter(v => v && v.id) : [];
+  if (!list.length) {
+    state.legacyData = true;
+    state.versions = [LEGACY_VER];
+    state.ver = LEGACY_VER.id;
+  } else {
+    state.legacyData = false;
+    state.versions = list;
+    state.ver = list.some(v => v.id === data.default) ? data.default : list[0].id;
+  }
+  // `?ver=kjv` 는 시대 플래그와 같은 길이다 — 한 번 정하고 그대로 저장된다.
+  const qv = new URLSearchParams(location.search).get('ver');
+  const saved = ls.get('ver');
+  if (qv && verOf(qv)) { state.ver = qv; ls.set('ver', qv); }
+  else if (saved && verOf(saved)) state.ver = saved;
+  $('verbtn').hidden = state.versions.length < 2;
+  $('verbtn-text').textContent = curVer().short || curVer().name;
+  renderVerMenu();
+}
+
+// --- 역본 메뉴 ---
+function renderVerMenu() {
+  const box = $('vermenu');
+  box.textContent = '';
+  for (const v of state.versions) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'veritem';
+    b.dataset.id = v.id;
+    b.setAttribute('role', 'menuitemradio');
+    b.setAttribute('aria-checked', String(v.id === state.ver));
+    const name = document.createElement('span');
+    name.className = 'ver-name';
+    name.textContent = v.name;
+    b.append(name);
+    if (v.short && v.short !== v.name) {          // 같으면 두 번 쓰지 않는다
+      const s = document.createElement('span');
+      s.className = 'ver-short';
+      s.textContent = v.short;
+      b.append(s);
+    }
+    if (v.type === 'online') {
+      const tag = document.createElement('span');
+      tag.className = 'ver-tag';
+      tag.textContent = '온라인';
+      b.append(tag);
+    }
+    box.append(b);
+  }
+}
+
+function setVerMenu(open) {
+  if (open && state.versions.length < 2) return;
+  $('vermenu').hidden = !open;
+  $('verbtn').setAttribute('aria-expanded', String(!!open));
+  if (open) $('vermenu').querySelector('.veritem[aria-checked="true"]')?.focus();
+}
+const verMenuOpen = () => !$('vermenu').hidden;
+
+// 역본을 바꾼다. 해시는 건드리지 않는다 — 역본은 주소에 넣지 않는다 (08-b).
+function setVersion(id, { remember = true, reload = true } = {}) {
+  const v = verOf(id);
+  if (!v) return;
+  const changed = state.ver !== v.id;
+  state.ver = v.id;
+  $('verbtn-text').textContent = v.short || v.name;
+  if (remember) ls.set('ver', v.id);
+  renderVerMenu();
+  setVerMenu(false);
+  renderVerAttr();
+  if (changed && reload && state.book && state.ch) reloadChapter();
+}
+
+function bindVersions() {
+  $('verbtn').addEventListener('click', () => setVerMenu(!verMenuOpen()));
+  $('vermenu').addEventListener('click', e => {
+    const it = e.target.closest?.('.veritem');
+    if (it) { setVersion(it.dataset.id); $('verbtn').focus(); }
+  });
+  $('vermenu').addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setVerMenu(false); $('verbtn').focus(); return; }
+    const d = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    const items = [...$('vermenu').querySelectorAll('.veritem')];
+    const i = items.indexOf(document.activeElement);
+    items[(Math.max(0, i) + d + items.length) % items.length]?.focus();
+  });
+  document.addEventListener('mousedown', e => {
+    if (!verMenuOpen()) return;
+    if ($('vermenu').contains(e.target) || $('verbtn').contains(e.target)) return;
+    setVerMenu(false);
+  });
+}
+
+// --- 온라인 역본 (ESV) ---
+// 우리 함수가 돌려주는 모양: { ok, verses:[{v,text}], notice } 또는 { ok:false, error }.
+async function fetchOnline(book, ch) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), ONLINE_TIMEOUT);
+  try {
+    const r = await fetch(ESV_URL + '?ref=' + encodeURIComponent(book + '.' + ch),
+      { signal: ac.signal });
+    let j = null;
+    try { j = await r.json(); } catch { /* JSON 이 아닐 수도 있다 */ }
+    if (j && r.ok && j.ok === true && Array.isArray(j.verses) && j.verses.length) return j;
+    return { ok: false, error: typeof j?.error === 'string' ? j.error : 'fail' };
+  } finally { clearTimeout(timer); }
+}
+
+// 온라인 역본의 지명 — **새 색인을 만들지 않는다.**
+// 어느 절에 어느 지명이 있는지는 정적 역본(개역한글)의 `mentions` 가 정한다 (OpenBible 판정 그대로).
+// 그 절에 있다고 적힌 지명만, 영어 본문에서 `en`·`alt_en` 으로 낱말 경계를 맞춰 찾는다.
+// 긴 이름이 이긴다. 겹치면 뒤엣것을 버린다. 대소문자는 가린다 — `On`(애굽의 성) 같은 이름이
+// 소문자 `on` 에 붙는 것을 막아야 한다.
+const GATE_MAX = 8;
+const gateCache = new Map();          // 'Josh/10' → { byVerse: Map(절 → [placeId]), places }
+async function verseGate(book, ch) {
+  const key = book + '/' + ch;
+  if (gateCache.has(key)) return gateCache.get(key);
+  const d = await getJSON(chapterPath(staticVer().id, book, ch));
+  const byVerse = new Map();
+  for (const v of d.verses || []) {
+    const ids = [...new Set((v.mentions || []).map(x => x.p))];
+    if (ids.length) byVerse.set(v.v, ids);
+  }
+  // 지도가 쓰는 `이 장의 지명` 목록도 여기서 가져온다. 역본이 달라도 **같은 장**이므로
+  // 지도와 `이 장에서 N회` 는 역본과 상관없이 같아야 한다 — 영어 낱말이 안 맞았다고
+  // 그 장에 없던 일이 되지는 않는다.
+  const gate = { byVerse, places: Array.isArray(d.places) ? d.places : [] };
+  if (gateCache.size >= GATE_MAX) gateCache.delete(gateCache.keys().next().value);
+  gateCache.set(key, gate);
+  return gate;
+}
+
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// 뒤돌아보기를 못 쓰는 엔진이면 `\b` 로 물러선다 (이름 양끝이 글자라 결과는 같다).
+const LOOKBEHIND = (() => { try { new RegExp('(?<!a)b'); return true; } catch { return false; } })();
+const bound = nm => (LOOKBEHIND
+  ? '(?<![A-Za-z0-9])' + escRe(nm) + '(?![A-Za-z0-9])'
+  : '\\b' + escRe(nm) + '\\b');
+
+// OpenBible 의 `en` 은 동명이지를 번호로 가른다 (`Jericho 1`). 번호는 떼고 쓴다.
+function enNamesOf(pl) {
+  const out = [];
+  const push = s => {
+    const t = String(s || '').trim();
+    if (t.length >= 2 && !out.includes(t)) out.push(t);
+  };
+  if (pl.en) { push(pl.en.replace(/\s+\d+$/, '')); push(pl.en); }
+  for (const a of pl.alt_en || []) push(a);
+  return out;
+}
+
+function enMentions(text, ids) {
+  const cands = [];
+  for (const p of ids || []) {
+    const pl = state.places[p];
+    if (!pl) continue;
+    for (const nm of enNamesOf(pl)) cands.push({ p, nm });
+  }
+  cands.sort((a, b) => b.nm.length - a.nm.length);
+  const out = [];
+  for (const c of cands) {
+    let re;
+    try { re = new RegExp(bound(c.nm), 'g'); } catch { continue; }
+    let m;
+    while ((m = re.exec(text))) {
+      const s = m.index, e = s + m[0].length;
+      if (!m[0].length) break;
+      if (out.some(o => s < o.e && e > o.s)) continue;     // 겹치면 긴 쪽이 이긴다
+      out.push({ s, e, p: c.p });
+    }
+  }
+  return out.sort((a, b) => a.s - b.s);
+}
 
 // --- 다크 모드 ---
 function setTheme(t) {
@@ -371,26 +578,78 @@ function showMsg(text) {
 let reqToken = 0;
 const stale = token => token !== reqToken;
 
+// 온라인 역본이 닿지 않았을 때. 본문 자리에 한 줄 + 돌아갈 버튼 하나.
+function showOnlineError(ver, kind) {
+  const back = staticVer();
+  $('verses').textContent = '';
+  const p = document.createElement('p');
+  p.className = 'msg';
+  p.textContent = kind === 'no_key'
+    ? `${ver.short || ver.name} API 키가 아직 설정되지 않았습니다`
+    : `${ver.short || ver.name} 본문을 불러오지 못했습니다 (온라인 전용)`;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.id = 'ver-fallback';
+  b.className = 'ver-fallback';
+  b.textContent = (back.short || back.name) + '로 보기';
+  b.addEventListener('click', () => setVersion(back.id));
+  $('verses').append(p, b);
+}
+
 async function loadChapter(token) {
   const book = state.book, ch = state.ch;        // 요청 시점의 장을 묶어 둔다
   const b = bookOf(book);
+  const ver = curVer();
   $('title').textContent = (b ? b.ko : book) + ' ' + ch + '장';
   $('verses').textContent = '';
+  $('verses').classList.toggle('lang-en', ver.lang === 'en');
   state.data = null;
+  state.esvNotice = '';
+  renderVerAttr();
   let data;
-  try {
-    data = await getJSON(`books/${book}/${ch}.json`);
-  } catch {
-    if (stale(token)) return;                    // 진 요청의 실패는 화면에 띄우지 않는다
-    showMsg('이 장을 불러오지 못했습니다. 데이터가 아직 없을 수 있습니다.');
-    return;
+  if (ver.type === 'online') {
+    // ESV 는 받아서 그리고 끝이다. 이 장 하나만 메모리에 남는다 (localStorage·IndexedDB 안 쓴다).
+    let res;
+    try { res = await fetchOnline(book, ch); }
+    catch { res = { ok: false, error: 'net' }; }
+    if (stale(token)) return;
+    if (!res.ok) { showOnlineError(ver, res.error === 'no_key' ? 'no_key' : 'fail'); return; }
+    state.esvNotice = typeof res.notice === 'string' ? res.notice.slice(0, 400) : '';
+    let gate = null;
+    try { gate = await verseGate(book, ch); } catch { gate = null; }   // 없으면 지명 없이 읽는다
+    if (stale(token)) return;
+    data = {
+      book, chapter: ch,
+      places: gate?.places || [],
+      verses: (res.verses || []).map(v => {
+        const text = String(v.text || '');
+        return { v: v.v, text, mentions: gate ? enMentions(text, gate.byVerse.get(v.v)) : [] };
+      }),
+    };
+    renderVerAttr();
+  } else {
+    try {
+      data = await getJSON(chapterPath(ver.id, book, ch));
+    } catch {
+      if (stale(token)) return;                  // 진 요청의 실패는 화면에 띄우지 않는다
+      showMsg('이 장을 불러오지 못했습니다. 데이터가 아직 없을 수 있습니다.');
+      return;
+    }
+    if (stale(token)) return;                    // 이긴 응답만 본문을 그린다
   }
-  if (stale(token)) return;                      // 이긴 응답만 본문을 그린다
   state.data = data;
   $('verses').textContent = '';
   const frag = document.createDocumentFragment();
   for (const v of data.verses) frag.append(renderVerse(v));
   $('verses').append(frag);
+}
+
+// 역본만 바뀌었을 때 — 장·해시·스크롤은 그대로 두고 본문만 다시 받는다.
+async function reloadChapter() {
+  const token = ++reqToken;
+  await loadChapter(token);
+  if (stale(token)) return;
+  applySel();
 }
 
 // --- 상단바 ---
@@ -672,6 +931,7 @@ const pick = {
   ch: null,        // 절 열이 보여 주는 장 (선택)
   v: null,         // 질의가 가리키는 절
   nv: 0,           // pick.ch 의 절 수 (0 = 아직 모름)
+  vnums: [],       // pick.ch 의 절 번호 목록 (빠진 절이 있을 수 있다 — 08-b)
   verr: false,     // 절 수를 못 받았다 (07-a)
   cho: null,       // 모바일 초성 칩
   step: 1,         // 모바일 단계 1=권 2=장 3=절
@@ -682,22 +942,32 @@ const pick = {
 
 // 장별 절 수 캐시. 지금 읽는 장은 이미 받아 둔 state.data 를 그대로 쓴다.
 // 못 받으면 **-1** 을 돌려준다 (0 = 아직 안 고름과 구별해야 한다). 실패는 캐시하지 않는다.
+//
+// 08-b: 역본마다 절 수가 다를 수 있다 (BSB 는 사본 이문 16절이 없다 — 마 17:21 …).
+//   · **지금 읽고 있는 장**은 화면에 그려진 그 역본을 그대로 센다 — 없는 절을 권하지 않는다.
+//     이 값은 캐시하지 않는다(공짜다). 캐시하면 역본을 바꿨을 때 옛 숫자가 남는다.
+//   · 다른 장은 **정적 역본**에서 센다 (온라인 역본을 절 세려고 부르지 않는다).
+//     그래서 캐시 열쇠에 역본 id 를 넣는다.
+//   · 절 번호는 **1..n 이 아닐 수 있다.** BSB 는 마 17:21 같은 절이 아예 없다. 그래서
+//     개수가 아니라 **번호 목록**을 들고 다닌다 — 격자의 칸이 실제 절 번호를 가리켜야 한다.
 const vcount = new Map();
-async function verseCount(book, ch) {
-  if (!book || !ch) return 0;
-  const key = book + '/' + ch;
+async function verseNums(book, ch) {
+  if (!book || !ch) return [];
+  if (state.book === book && state.ch === ch && state.data) return state.data.verses.map(v => v.v);
+  const src = staticVer().id;
+  const key = src + '/' + book + '/' + ch;
   if (vcount.has(key)) return vcount.get(key);
-  if (state.book === book && state.ch === ch && state.data) {
-    const n = state.data.verses.length;
-    vcount.set(key, n);
-    return n;
-  }
   try {
-    const d = await getJSON(`books/${book}/${ch}.json`);
-    const n = (d.verses || []).length;
-    vcount.set(key, n);
-    return n;
-  } catch { return -1; }
+    const d = await getJSON(chapterPath(src, book, ch));
+    const ns = (d.verses || []).map(v => v.v);
+    vcount.set(key, ns);
+    return ns;
+  } catch { return null; }              // 실패는 null — 빈 장(있을 수 없다)과 구별한다
+}
+// 개수만 필요한 곳을 위해 남겨 둔다. 못 받으면 **-1** (0 = 아직 안 고름과 구별해야 한다).
+async function verseCount(book, ch) {
+  const ns = await verseNums(book, ch);
+  return ns === null ? -1 : ns.length;
 }
 
 // --- 절로 가기. 해시는 그대로 두고 스크롤 + 2초 표시. ---
@@ -773,7 +1043,10 @@ function renderBooks() {
   sel?.scrollIntoView({ block: 'nearest' });
 }
 
-function numGrid(col, n, cur, hint) {
+// 숫자 격자. 장은 1..n 이 빠짐없이 이어지지만 **절은 그렇지 않다** — 역본에 따라 빠진 절이
+// 있다 (BSB 는 마 17:21 같은 사본 이문 16절이 없다). 그래서 번호 목록(`nums`)을 받으면
+// 그것을 그대로 그린다. 없으면 예전처럼 1..n.
+function numGrid(col, n, cur, hint, nums) {
   col.textContent = '';
   if (!n) {
     const p = document.createElement('p');
@@ -782,15 +1055,17 @@ function numGrid(col, n, cur, hint) {
     col.append(p);
     return;
   }
+  const list = nums && nums.length ? nums : Array.from({ length: n }, (_, i) => i + 1);
+  const first = list[0];
   const frag = document.createDocumentFragment();
-  for (let i = 1; i <= n; i++) {
+  for (const i of list) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'num';
     b.dataset.n = i;
     b.setAttribute('role', 'option');
     b.setAttribute('aria-selected', String(i === cur));
-    b.tabIndex = i === (cur || 1) ? 0 : -1;
+    b.tabIndex = i === (cur || first) ? 0 : -1;
     b.textContent = i;
     frag.append(b);
   }
@@ -812,7 +1087,7 @@ function renderVerses() {
   whole.hidden = !picked;
   whole.textContent = picked ? pick.ch + '장 처음부터 보기' : '';
   const hint = picked && pick.verr ? '절 목록을 불러오지 못했습니다' : '장을 고르세요';
-  numGrid($('col-v'), picked ? pick.nv : 0, pick.v, hint);
+  numGrid($('col-v'), picked ? pick.nv : 0, pick.v, hint, pick.vnums);
 }
 
 function renderChips() {
@@ -857,11 +1132,12 @@ function renderPicker() {
 let vseq = 0;
 async function refreshVerses() {
   const my = ++vseq;
-  const n = await verseCount(pick.book, pick.ch);
+  const ns = await verseNums(pick.book, pick.ch);
   if (my !== vseq) return;
-  pick.verr = n < 0;
-  pick.nv = n < 0 ? 0 : n;
-  if (pick.v && pick.v > pick.nv) pick.v = null;
+  pick.verr = ns === null;
+  pick.vnums = ns || [];
+  pick.nv = pick.vnums.length;
+  if (pick.v && !pick.vnums.includes(pick.v)) pick.v = null;   // 없는 절은 고른 채로 두지 않는다
   if (pick.open) renderVerses();
 }
 
@@ -873,6 +1149,7 @@ function setBook(id, { step = false } = {}) {
   pick.ch = id === state.book ? state.ch : null;
   pick.v = null;
   pick.nv = 0;
+  pick.vnums = [];
   pick.verr = false;
   if (step && !PICK_WIDE()) pick.step = 2;
   renderPicker();
@@ -885,6 +1162,7 @@ function chooseChapter(n) {
   pick.ch = n;
   pick.v = null;
   pick.nv = 0;
+  pick.vnums = [];
   pick.verr = false;
   if (!PICK_WIDE()) pick.step = 3;
   renderPicker();
@@ -931,6 +1209,7 @@ function applyQuery() {
   if (typed) { goChapterStart(); return; }
   pick.v = null;
   pick.nv = 0;
+  pick.vnums = [];
   pick.verr = false;
   if (!PICK_WIDE()) pick.step = 2;
   renderPicker();
@@ -955,6 +1234,7 @@ function openPicker() {
   pick.ch = state.ch;
   pick.v = null;
   pick.nv = 0;
+  pick.vnums = [];
   pick.verr = false;
   pick.cho = null;
   pick.step = 1;
@@ -1018,6 +1298,7 @@ function bindPicker() {
       pick.book = pick.list[0].id;
       pick.ch = null;
       pick.nv = 0;
+      pick.vnums = [];
     }
     const b = pick.book && bookOf(pick.book);
     if (b && pick.q.ch) {
@@ -1366,12 +1647,35 @@ function attrNode(it) {
 // 패널은 자리가 좁으니 예전처럼 이름만 짧게 — 링크는 푸터 한 곳에만 둔다.
 function renderAttr(items) {
   const foot = $('attr-line');
+  state.attrList = items;
   foot.textContent = '';
   items.forEach((it, i) => {
     if (i) foot.append(document.createTextNode(' · '));
     foot.append(attrNode(it));
   });
-  $('panel-attr').textContent = items.map(it => it.text).join(' · ');
+  renderVerAttr();
+}
+
+// 지금 보고 있는 역본의 출처 한 줄 (08-b). 출처 목록에 이미 같은 문장이 있으면 —
+// 개역한글이 그렇다 — 두 번 쓰지 않는다. 온라인 역본은 함수가 돌려준 고지문을 그대로 쓴다.
+function renderVerAttr() {
+  const el = $('attr-ver');
+  const v = curVer();
+  const base = state.attrList.map(it => it.text).join(' · ');
+  // 패널은 자리가 좁다 — 역본은 이름만, 긴 고지문은 푸터 한 곳에.
+  $('panel-attr').textContent =
+    state.versions.length > 1 && base ? v.name + ' · ' + base : base;
+  el.textContent = '';
+  const text = state.esvNotice || v.attribution || '';
+  const dup = !state.esvNotice && state.attrList.some(it => it.text === text);
+  if (!text || dup) { el.hidden = true; return; }
+  el.hidden = false;
+  el.append(document.createTextNode('본문: ' + text));
+  if (v.attribution_url) {
+    el.append(document.createTextNode(' '));
+    el.append(extLink(v.attribution_url, v.attribution_url.replace(/^https?:\/\//, '')));
+  }
+  if (v.type === 'online' && v.note) el.append(document.createTextNode(' — ' + v.note));
 }
 
 // --- 부팅 ---
@@ -1390,6 +1694,10 @@ async function boot() {
     showMsg('데이터를 불러오지 못했습니다. ' + DATA_BASE + ' 경로를 확인해 주세요.');
     return;
   }
+  // 역본 목록 (08-b). 못 받으면 옛 배포본으로 보고 `books/…` 를 예전 그대로 읽는다.
+  let versions = null;
+  try { versions = await getJSON('versions.json'); } catch { versions = null; }
+  initVersions(versions);
   // 지형은 한 번만 받아 캐시. 없어도 본문은 읽힌다.
   for (const k of ['land', 'lakes', 'rivers']) {
     try { state.layers[k] = await getJSON(`geo/${k}.json`); } catch { state.layers[k] = null; }
@@ -1416,6 +1724,7 @@ async function boot() {
   renderAttr(attrItems(state.attr));
 
   bindPicker();
+  bindVersions();
   bindFeedback();
   $('btn-prev').addEventListener('click', () => step(-1));
   $('btn-next').addEventListener('click', () => step(1));
@@ -1437,6 +1746,10 @@ async function boot() {
   document.addEventListener('keydown', e => {
     if (fb.open) {                               // 피드백 카드가 제일 위(70)다 — Esc 를 먼저 받는다
       if (e.key === 'Escape') { e.preventDefault(); closeFb(); }
+      return;
+    }
+    if (verMenuOpen()) {                         // 역본 메뉴도 제 Esc 를 먼저 받는다
+      if (e.key === 'Escape') { e.preventDefault(); setVerMenu(false); $('verbtn').focus(); }
       return;
     }
     if (pick.open) return;                       // 피커가 열려 있으면 피커가 먼저 받는다
@@ -1469,13 +1782,17 @@ async function boot() {
     setPanelW, saveW, panelMax, relayout, mapSize, scene,
     // 성경 찾기 (Spike 04)
     pick, openPicker, closePicker, renderPicker, rebuildList, goChapterStart,
-    parseQuery, matchBook, koPrefix, choOf, scrollToVerse, verseCount,
+    parseQuery, matchBook, koPrefix, choOf, scrollToVerse, verseCount, verseNums,
     // 피드백 (Spike 05-b)
     fb, openFb, closeFb, fbLocText, fbVerse, fbDevice, fbCopyText, fbSetLoc, FEEDBACK_URL,
     fbSend, fbSync,
     // 06-b (리뷰 반영): 순수 네비게이션·해시 검증·출처
     stepRef, isValidRef, step, lastValidRef, parseHash,
     attrItems, renderAttr, scheduleDraw,
+    // 역본 (Spike 08-b)
+    setVersion, setVerMenu, verMenuOpen, curVer, verOf, staticVer, chapterPath,
+    initVersions, renderVerMenu, renderVerAttr, reloadChapter,
+    enMentions, enNamesOf, verseGate, fetchOnline, ESV_URL,
   };
   await apply();
 }
