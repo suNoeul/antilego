@@ -9,6 +9,9 @@
   --dot: #8a5a2b;
   --dot-dim: #c7b8a3;
   --label: #2b2b2b;
+  --terrain-shadow: #777c60;
+  --terrain-highlight: #fffaf0;
+  --terrain-accent: #b5aa8b;
   /* 시대 영역 (Spike 03-d). 2~3색 순환 + 지명 라벨보다 옅은 회갈색 이름. */
   --label-dim: #7d6f5c;
   --region-a: rgba(201, 162, 39, .26);
@@ -56,6 +59,9 @@
   --dot: #d9a066;
   --dot-dim: #5a5048;
   --label: #e8e2d8;
+  --terrain-shadow: #101917;
+  --terrain-highlight: #777461;
+  --terrain-accent: #414539;
   --label-dim: #a09384;
   --region-a: rgba(214, 180, 88, .22);
   --region-a-line: rgba(214, 180, 88, .62);
@@ -435,6 +441,49 @@ body.panel-open .fabs { right: var(--panel-w); }
   cursor: grab;
 }
 .panel-map.grabbing { cursor: grabbing; }
+
+/* 실제 지형이 준비될 때까지 SVG를 보존한다. 치수는 SVG가 계속 담당한다. */
+.map-wrap .terrain-map { position: absolute; inset: 0; opacity: 0; pointer-events: none; font-family: var(--sans); }
+.map-wrap.terrain-ready .terrain-map { opacity: 1; pointer-events: auto; }
+.terrain-ready .panel-map { opacity: 0; pointer-events: none; }
+.terrain-map .maplibregl-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.terrain-label {
+  border: 0; background: none; padding: 0 0 10px; color: var(--label);
+  font: 11px/1.3 var(--sans); white-space: nowrap; cursor: pointer;
+}
+.terrain-label span {
+  display: block; padding: 2px 5px; border-radius: 4px;
+  background: var(--panel-bg); box-shadow: 0 1px 4px rgba(30, 25, 15, .08);
+}
+.terrain-label::after {
+  content: ''; position: absolute; bottom: 0; left: calc(50% - 2px);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--dot-dim);
+}
+.terrain-label.is-focus { z-index: 1; font-size: 13px; font-weight: 700; }
+.terrain-label.is-focus span { border: 1px solid var(--coast); }
+.terrain-label.is-focus::after { background: var(--dot); width: 7px; height: 7px; left: calc(50% - 3.5px); }
+.terrain-label.is-region { color: var(--label-dim); font-size: 10px; cursor: default; }
+.terrain-label.is-region span { background: transparent; box-shadow: none; text-shadow: 0 1px 2px var(--land); }
+.terrain-label.is-region::after { display: none; }
+.terrain-label:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.terrain-meta { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; margin-top: 8px; }
+.terrain-meta p, .terrain-note p { margin: 0; }
+.terrain-meta, .terrain-note { font-size: 10px; line-height: 1.6; color: var(--muted); }
+.terrain-meta button { flex-shrink: 0; border: 0; padding: 4px 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.terrain-note[hidden] { display: none; }
+.terrain-note a { color: var(--accent); }
+.terrain-help { margin-bottom: 4px !important; }
+.terrain-help-touch { display: none; }
+.terrain-sources summary { cursor: pointer; }
+.terrain-sources p { margin-top: 6px; }
+@media (pointer: coarse) {
+  .zoom-ctl .zbtn { min-width: 32px; height: 36px; }
+  .terrain-help-touch { display: inline; }
+  .terrain-help-mouse { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel { transition: none; }
+}
 
 /* 가장자리 fade — 네 변이 패널 배경으로 스며든다. 지도가 액자에 갇힌 그림이 아니라
    "더 있다"로 읽히게. 포인터는 통과시킨다(드래그가 살아 있어야 한다). */

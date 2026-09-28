@@ -46,6 +46,66 @@ const state = {
   eraLayer: false,                               // 시대 영역 레이어. 기본 꺼짐
   pendingVerse: null,                            // 성경 찾기에서 고른 절 (장 이동 후 스크롤)
 };
+const NO_REGIONS = [];
+
+// 지형은 패널을 처음 열 때만 로드한다. 실패해도 기존 SVG·본문은 독립적으로 동작한다.
+let terrain = null, terrainStarting = false, terrainFailed = false;
+let simpleMap = ls.get('mapMode') === 'simple'
+  || new URLSearchParams(location.search).get('map') === 'simple';
+const terrainKey = () => `${state.book}.${state.ch}/${state.sel || ''}`;
+const terrainActive = () => !simpleMap && !!terrain?.ready && !terrain.disposed;
+
+function syncTerrainUI() {
+  const active = terrainActive();
+  $('map-wrap').classList.toggle('terrain-ready', active);
+  $('terrain-map').inert = !active || !state.open;
+  $('terrain-map').setAttribute('aria-hidden', String(!active));
+  $('map').setAttribute('aria-hidden', String(active));
+  const tilted = active && terrain.map.getPitch() > 5;
+  $('z-terrain').disabled = !active;
+  $('z-terrain').textContent = tilted ? '위에서 보기' : '지형 보기';
+  $('z-terrain').setAttribute('aria-pressed', String(tilted));
+  $('map-mode').textContent = simpleMap ? '지형 지도 사용' : terrainFailed ? '지형 다시 시도' : '간단 지도';
+  $('terrain-note').hidden = !active;
+  $('terrain-status').textContent = simpleMap ? '간단 지도'
+    : terrainFailed ? '지형을 불러오지 못해 간단 지도를 표시합니다.'
+      : active ? '현대 지형 참고 · 고대 지형 복원 아님' : '지형을 불러오는 중…';
+  if (active) {
+    $('z-in').disabled = terrain.map.getZoom() >= 12.49;
+    $('z-out').disabled = terrain.map.getZoom() <= 4.01;
+  }
+}
+
+async function ensureTerrain() {
+  if (simpleMap || terrainFailed || terrainStarting || terrain || !state.open) return;
+  terrainStarting = true;
+  syncTerrainUI();
+  try {
+    const { createTerrain } = await import('./terrain.js?v=__V__');
+    if (simpleMap || !state.open) return;
+    terrain = await createTerrain({
+      container: $('terrain-map'), layers: state.layers, scene: scene(), key: terrainKey(),
+      isOpen: () => state.open && !simpleMap && !document.hidden,
+      onReady: () => { syncTerrainUI(); if (state.open) terrain?.resize(); },
+      onChange: () => syncTerrainUI(),
+      onSelect: id => go(state.book, state.ch, id),
+      onFail: () => {
+        terrain = null; terrainFailed = true;
+        if (state.open) drawMap();
+        syncTerrainUI();
+      },
+    });
+    if (terrain) {
+      terrain.update(scene(), terrainKey());
+      if (simpleMap) { terrain.destroy(); terrain = null; }
+    }
+  } catch {
+    terrain?.destroy(); terrain = null; terrainFailed = true;
+  } finally {
+    terrainStarting = false;
+    syncTerrainUI();
+  }
+}
 
 // --- 시대 (Spike 03-d) ---
 // 이 장의 시대. chapter_eras.json 의 ranges 가 default 를 이긴다.
@@ -58,7 +118,7 @@ function eraOf(book, ch) {
   return state.eras?.[rec.default] || null;
 }
 // 이 시대의 영역. 시대를 특정하지 않는 장(원시사·시대 불특정)은 빈 배열이 정상이다.
-const regionsOf = era => (era && state.regionsByEra?.[era.id]) || [];
+const regionsOf = era => (era && state.regionsByEra?.[era.id]) || NO_REGIONS;
 
 const getJSON = async path => {
   const r = await fetch(bust(DATA_BASE + path));
@@ -80,6 +140,10 @@ const bookOf = id => (state.index?.books || []).find(b => b.id === id);
 
 const ESV_URL = 'https://antilego-api.vercel.app/api/esv';
 const ONLINE_TIMEOUT = 10000;
+// 배포자가 선언한 키 미설정 상태. 실제 성공 응답을 받으면 이 탭에서 바로 해제한다.
+// 상태 확인만을 위한 API 요청은 보내지 않는다.
+const onlineStatus = { esv: document.querySelector('meta[name="antilego-esv-status"]')?.content || '' };
+let lastStaticVer = null;
 
 const LEGACY_VER = {
   id: 'krv', name: '개역한글', short: '개역한글', lang: 'ko', type: 'static',
@@ -110,6 +174,8 @@ function initVersions(data) {
   const saved = ls.get('ver');
   if (qv && verOf(qv)) { state.ver = qv; ls.set('ver', qv); }
   else if (saved && verOf(saved)) state.ver = saved;
+  lastStaticVer = curVer().type === 'static' ? state.ver
+    : (verOf(saved)?.type === 'static' ? saved : staticVer().id);
   $('verbtn').hidden = state.versions.length < 2;
   $('verbtn-text').textContent = curVer().short || curVer().name;
   renderVerMenu();
@@ -139,7 +205,7 @@ function renderVerMenu() {
     if (v.type === 'online') {
       const tag = document.createElement('span');
       tag.className = 'ver-tag';
-      tag.textContent = '온라인';
+      tag.textContent = onlineStatus[v.id] === 'no_key' ? '온라인 · 키 없음' : '온라인';
       b.append(tag);
     }
     box.append(b);
@@ -159,13 +225,14 @@ function setVersion(id, { remember = true, reload = true } = {}) {
   const v = verOf(id);
   if (!v) return;
   const changed = state.ver !== v.id;
+  if (curVer().type === 'static') lastStaticVer = state.ver;
   state.ver = v.id;
   $('verbtn-text').textContent = v.short || v.name;
   if (remember) ls.set('ver', v.id);
   renderVerMenu();
   setVerMenu(false);
   renderVerAttr();
-  if (changed && reload && state.book && state.ch) reloadChapter();
+  if ((changed || v.type === 'online') && reload && state.book && state.ch) reloadChapter();
 }
 
 function bindVersions() {
@@ -175,7 +242,6 @@ function bindVersions() {
     if (it) { setVersion(it.dataset.id); $('verbtn').focus(); }
   });
   $('vermenu').addEventListener('keydown', e => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setVerMenu(false); $('verbtn').focus(); return; }
     const d = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
     if (!d) return;
     e.preventDefault();
@@ -277,6 +343,7 @@ function setTheme(t) {
   document.documentElement.dataset.theme = t;
   $('btn-theme').setAttribute('aria-pressed', String(t === 'dark'));
   ls.set('theme', t);
+  terrain?.theme();
 }
 
 // --- 해시 라우팅: #Josh.10 / #Josh.10/a231f80 ---
@@ -305,7 +372,7 @@ function scene() {
     focus: pid && state.places[pid] ? [pid] : [],
     others: inCh.filter(p => p !== pid),
     places: state.places,
-    regions: state.eraLayer ? regionsOf(eraOf(state.book, state.ch)) : [],
+    regions: state.eraLayer ? regionsOf(eraOf(state.book, state.ch)) : NO_REGIONS,
   };
 }
 
@@ -349,11 +416,20 @@ function mapSize() {
 
 function drawMap() {
   mapSize();
+  if (terrainActive()) {
+    terrain.update(scene(), terrainKey());
+    terrain.resize();
+    syncTerrainUI();
+    return;
+  }
   state.view = clampView(state.view, state.render?.bounds);
   state.render = renderScene($('map'), scene(), state.layers, TOKENS, state.view);
   state.view = state.render.view;
   $('z-out').disabled = state.view.z <= 1.001;
   $('z-in').disabled = state.view.z >= 7.999;
+  terrain?.update(scene(), terrainKey());
+  if (state.open) ensureTerrain();
+  syncTerrainUI();
 }
 
 // 크기가 바뀌어도 보던 자리와 배율은 그대로. 새 크기에서 화면 한가운데가 같은 지점을
@@ -400,6 +476,7 @@ function scheduleDraw() {
 // 최대 세 번까지 맞춘다.
 const FIT = 24;
 function fitFocus() {
+  if (terrainActive()) return; // 새 선택은 지형 어댑터가 해당 장소 주변으로 맞춘다.
   for (let i = 0; i < 3; i++) {
     const b = state.render?.focusBox;
     if (!b) return;
@@ -515,7 +592,10 @@ function setEraLayer(on, remember = true) {
   if (state.open) { drawMap(); renderEra(); }
 }
 
-function setPanel(open, remember = true) {
+let panelOpener = null;
+function setPanel(open, remember = true, opener = document.activeElement) {
+  const wasOpen = state.open;
+  if (open && !wasOpen) panelOpener = opener?.closest?.('button') || $('btn-map');
   state.open = !!open;
   document.body.classList.toggle('panel-open', state.open);
   $('btn-map').setAttribute('aria-expanded', String(state.open));
@@ -523,6 +603,11 @@ function setPanel(open, remember = true) {
   $('panel').setAttribute('aria-hidden', String(!state.open));
   if (remember) ls.set('panel', state.open ? '1' : '0');
   if (state.open) renderPanel();
+  else {
+    terrain?.stop();
+    if (wasOpen && remember) (panelOpener?.isConnected ? panelOpener : $('btn-map')).focus({ preventScroll: true });
+  }
+  syncTerrainUI();
 }
 
 const resetView = () => { state.view = { ...BASE_VIEW }; };
@@ -580,7 +665,7 @@ const stale = token => token !== reqToken;
 
 // 온라인 역본이 닿지 않았을 때. 본문 자리에 한 줄 + 돌아갈 버튼 하나.
 function showOnlineError(ver, kind) {
-  const back = staticVer();
+  const back = verOf(lastStaticVer) || staticVer();
   $('verses').textContent = '';
   const p = document.createElement('p');
   p.className = 'msg';
@@ -592,7 +677,7 @@ function showOnlineError(ver, kind) {
   b.id = 'ver-fallback';
   b.className = 'ver-fallback';
   b.textContent = (back.short || back.name) + '로 보기';
-  b.addEventListener('click', () => setVersion(back.id));
+  b.addEventListener('click', () => { setVersion(back.id); $('verbtn').focus(); });
   $('verses').append(p, b);
 }
 
@@ -613,6 +698,12 @@ async function loadChapter(token) {
     try { res = await fetchOnline(book, ch); }
     catch { res = { ok: false, error: 'net' }; }
     if (stale(token)) return;
+    // 메뉴를 다시 만들지 않고 꼬리표만 갱신해 열려 있는 메뉴의 포커스를 보존한다.
+    if (res.ok || res.error === 'no_key') {
+      onlineStatus[ver.id] = res.ok ? '' : 'no_key';
+      const tag = $('vermenu').querySelector(`[data-id="${ver.id}"] .ver-tag`);
+      if (tag) tag.textContent = res.ok ? '온라인' : '온라인 · 키 없음';
+    }
     if (!res.ok) { showOnlineError(ver, res.error === 'no_key' ? 'no_key' : 'fail'); return; }
     state.esvNotice = typeof res.notice === 'string' ? res.notice.slice(0, 400) : '';
     let gate = null;
@@ -791,13 +882,29 @@ function bindMapGestures() {
   svg.addEventListener('pointercancel', up);
 
   const zoomBtn = f => () => {
+    if (terrainActive()) { terrain.zoom(Math.log2(f)); return; }
     const [ax, ay] = anchor();
     state.view = zoomAt(state.view, ax, ay, f, state.render?.bounds);
     drawMap();
   };
   $('z-in').addEventListener('click', zoomBtn(1.6));
   $('z-out').addEventListener('click', zoomBtn(1 / 1.6));
-  $('z-reset').addEventListener('click', () => { resetView(); drawMap(); fitFocus(); });
+  $('z-reset').addEventListener('click', () => {
+    if (terrainActive()) { terrain.fit(); return; }
+    resetView(); drawMap(); fitFocus();
+  });
+  $('z-terrain').addEventListener('click', () => { if (terrainActive()) terrain.tilt(); });
+  $('map-mode').addEventListener('click', () => {
+    simpleMap = !(simpleMap || terrainFailed);
+    ls.set('mapMode', simpleMap ? 'simple' : 'terrain');
+    terrainFailed = false;
+    if (simpleMap) { terrain?.destroy(); terrain = null; }
+    drawMap();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) terrain?.stop();
+    else if (state.open) { ensureTerrain(); terrain?.resize(); }
+  });
 }
 
 // 패널 왼쪽 가장자리를 끌어 폭을 바꾼다 (02-c). 마우스·터치·펜 모두 Pointer Events 하나로.
@@ -1047,6 +1154,7 @@ function renderBooks() {
 // 있다 (BSB 는 마 17:21 같은 사본 이문 16절이 없다). 그래서 번호 목록(`nums`)을 받으면
 // 그것을 그대로 그린다. 없으면 예전처럼 1..n.
 function numGrid(col, n, cur, hint, nums) {
+  const focused = col.contains(document.activeElement) ? document.activeElement.dataset.n : null;
   col.textContent = '';
   if (!n) {
     const p = document.createElement('p');
@@ -1057,6 +1165,7 @@ function numGrid(col, n, cur, hint, nums) {
   }
   const list = nums && nums.length ? nums : Array.from({ length: n }, (_, i) => i + 1);
   const first = list[0];
+  const cursor = list.includes(+focused) ? +focused : (list.includes(cur) ? cur : first);
   const frag = document.createDocumentFragment();
   for (const i of list) {
     const b = document.createElement('button');
@@ -1065,11 +1174,12 @@ function numGrid(col, n, cur, hint, nums) {
     b.dataset.n = i;
     b.setAttribute('role', 'option');
     b.setAttribute('aria-selected', String(i === cur));
-    b.tabIndex = i === (cur || first) ? 0 : -1;
+    b.tabIndex = i === cursor ? 0 : -1;
     b.textContent = i;
     frag.append(b);
   }
   col.append(frag);
+  if (focused) col.querySelector('[tabindex="0"]')?.focus();
   col.querySelector('.num[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -1154,6 +1264,7 @@ function setBook(id, { step = false } = {}) {
   if (step && !PICK_WIDE()) pick.step = 2;
   renderPicker();
   if (pick.ch) refreshVerses();
+  if (step) focusPickColumn(PICK_WIDE() ? 'col-book' : 'col-ch');
 }
 
 // 장을 고른다 — **옮기지 않는다** (07-a). 절 열만 채우고 모바일은 절 단계로 넘어간다.
@@ -1170,6 +1281,7 @@ function chooseChapter(n) {
   // 다시 그리면서 누른 버튼이 사라진다. 방금 고른 장에 포커스를 돌려줘야
   // 바로 이어지는 `Enter` 가 그 장으로 간다 (장만 보는 길).
   if (PICK_WIDE()) $('col-ch').querySelector('.num[aria-selected="true"]')?.focus();
+  else $('pick-whole').focus();
 }
 
 // 장만 고르고 끝내는 길 — 그 장 1절로 옮기고 닫는다.
@@ -1219,9 +1331,10 @@ function applyQuery() {
 
 function moveHi(d) {
   if (!pick.list.length) return;
+  const hadFocus = $('col-book').contains(document.activeElement);
   pick.hi = Math.max(0, Math.min(pick.list.length - 1, (pick.hi < 0 ? 0 : pick.hi) + d));
   renderBooks();
-  if ($('col-book').contains(document.activeElement)) {
+  if (hadFocus) {
     $('col-book').querySelector('.bk.hi')?.focus();
   }
 }
@@ -1247,6 +1360,7 @@ function openPicker() {
   renderPicker();
   refreshVerses();
   if (PICK_WIDE()) $('pick-q').focus();
+  else $('pick-x').focus();                 // 모바일 키보드를 자동으로 띄우지 않는다
 }
 
 function closePicker() {
@@ -1267,17 +1381,41 @@ function pickSync() {
   renderCrumb();
 }
 
-// --- Tab 으로 열을 돈다: 입력 → 성경권 → 장 → 절 → × → 입력 ---
+const visibleControl = el => el && !el.disabled && el.getClientRects().length > 0
+  && getComputedStyle(el).visibility !== 'hidden';
+function focusPickColumn(id) {
+  ($(id).querySelector('[tabindex="0"]') || $('pick-x')).focus();
+}
+
+// 숫자 값이 아닌 실제 버튼 순서로 이동한다 (BSB의 누락 절 포함).
+// ↑↓ 폭은 CSS가 실제 배치한 열 수를 사용하므로 창 크기에 따라 달라진다.
+function moveNumber(e, col) {
+  const buttons = [...col.querySelectorAll('.num')];
+  const i = buttons.indexOf(e.target.closest?.('.num'));
+  if (i < 0) return false;
+  const columns = getComputedStyle(col).gridTemplateColumns.split(' ').length;
+  const next = { ArrowLeft: i - 1, ArrowRight: i + 1, ArrowUp: i - columns,
+    ArrowDown: i + columns, Home: 0, End: buttons.length - 1 }[e.key];
+  if (next === undefined) return false;
+  e.preventDefault();
+  const target = buttons[Math.max(0, Math.min(buttons.length - 1, next))];
+  for (const b of buttons) b.tabIndex = b === target ? 0 : -1;
+  target.focus();
+  return true;
+}
+
+// --- 보이는 입력·칩·열의 커서·뒤로·처음부터·닫기만 Tab 순환 ---
 function tabTargets() {
   const first = el => el.querySelector('[tabindex="0"]') || el.querySelector('button');
-  return [$('pick-q'), first($('col-book')), first($('col-ch')), first($('col-v')), $('pick-x')]
-    .filter(Boolean);
+  return [$('pick-q'), ...$('pick-chips').querySelectorAll('button'), first($('col-book')),
+    first($('col-ch')), $('pick-whole'), first($('col-v')), $('pick-back'), $('pick-x')]
+    .filter(visibleControl);
 }
 function cycleTab(back) {
   const t = tabTargets();
   const cur = t.findIndex(el => el === document.activeElement || el.contains?.(document.activeElement));
-  const i = cur < 0 ? 0 : (cur + (back ? -1 : 1) + t.length) % t.length;
-  t[i].focus();
+  const i = cur < 0 ? (back ? t.length - 1 : 0) : (cur + (back ? -1 : 1) + t.length) % t.length;
+  t[i]?.focus();
 }
 
 function bindPicker() {
@@ -1288,6 +1426,7 @@ function bindPicker() {
   $('pick-back').addEventListener('click', () => {
     pick.step = Math.max(1, pick.step - 1);
     renderCrumb();
+    focusPickColumn(pick.step === 1 ? 'col-book' : 'col-ch');
   });
 
   q.addEventListener('input', () => {
@@ -1330,18 +1469,23 @@ function bindPicker() {
       rebuildList();
       renderChips();
       renderPicker();
+      $('pick-chips').querySelector(`[data-cho="${chip.dataset.cho}"]`)?.focus();
     }
   });
 
   $('picker').addEventListener('keydown', e => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePicker(); return; }
+    if (fb.open) return;                         // 위에 열린 피드백이 키를 받는다
     if (e.key === 'Tab') { e.preventDefault(); cycleTab(e.shiftKey); return; }
     const inList = e.target === q || $('col-book').contains(e.target);
-    if (inList && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    if (inList && (e.key === 'ArrowDown' || e.key === 'ArrowUp'
+        || (e.target !== q && (e.key === 'Home' || e.key === 'End')))) {
       e.preventDefault();
-      moveHi(e.key === 'ArrowDown' ? 1 : -1);
+      moveHi(e.key === 'Home' ? -pick.list.length : e.key === 'End' ? pick.list.length
+        : e.key === 'ArrowDown' ? 1 : -1);
       return;
     }
+    const col = e.target.closest?.('#col-ch, #col-v');
+    if (col && moveNumber(e, col)) return;
     if (e.key === 'Enter' && e.target === q) { e.preventDefault(); applyQuery(); return; }
     if (e.key === 'Enter' && $('col-book').contains(e.target)) {
       e.preventDefault();
@@ -1362,7 +1506,8 @@ function bindPicker() {
   // 바깥 누르면 닫힘 (데스크톱 팝오버). 모바일 시트는 화면을 다 덮으니 해당 없음.
   document.addEventListener('mousedown', e => {
     if (!pick.open) return;
-    if ($('picker').contains(e.target) || $('loc').contains(e.target)) return;
+    if ($('picker').contains(e.target) || $('loc').contains(e.target)
+        || $('fb-card').contains(e.target) || $('btn-fb').contains(e.target)) return;
     closePicker();
   });
 }
@@ -1585,9 +1730,6 @@ function bindFeedback() {
   $('fb-copy').addEventListener('click', fbCopy);
   $('fb-text').addEventListener('input', () => { fbGrow(); fbSync(); });
   $('fb-name').addEventListener('input', () => ls.set('fbName', $('fb-name').value.trim()));
-  $('fb-card').addEventListener('keydown', e => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFb(); }
-  });
   // 바깥 누르면 닫힘 — 데스크톱 팝오버만. 모바일 시트는 아래에 붙어 있어 오발이 잦다.
   document.addEventListener('mousedown', e => {
     if (!fb.open || window.innerWidth < 900) return;
@@ -1729,7 +1871,7 @@ async function boot() {
   $('btn-prev').addEventListener('click', () => step(-1));
   $('btn-next').addEventListener('click', () => step(1));
 
-  $('btn-map').addEventListener('click', () => setPanel(!state.open));
+  $('btn-map').addEventListener('click', () => setPanel(!state.open, true, $('btn-map')));
   $('z-era').addEventListener('click', () => setEraLayer(!state.eraLayer));
   $('scrim').addEventListener('click', () => setPanel(false));
   bindMapGestures();
@@ -1741,19 +1883,29 @@ async function boot() {
     if (!b) return;
     const on = b.dataset.p === state.sel;       // 같은 지명 → 선택 해제
     go(state.book, state.ch, on ? null : b.dataset.p);
-    if (!state.open) setPanel(true);            // 지명을 누르면 패널이 열린다
+    if (!state.open) setPanel(true, true, b);   // 지명을 누르면 패널이 열린다
   });
   document.addEventListener('keydown', e => {
+    // Esc는 포커스 위치와 무관하게 여기 한 곳에서 한 UI만 닫는다.
+    if (e.key === 'Escape') {
+      if (fb.open) closeFb();
+      else if (pick.open) closePicker();
+      else if (verMenuOpen()) { setVerMenu(false); $('verbtn').focus(); }
+      else if (state.open) setPanel(false);
+      else return;
+      e.preventDefault();
+      return;
+    }
     if (fb.open) {                               // 피드백 카드가 제일 위(70)다 — Esc 를 먼저 받는다
-      if (e.key === 'Escape') { e.preventDefault(); closeFb(); }
       return;
     }
     if (verMenuOpen()) {                         // 역본 메뉴도 제 Esc 를 먼저 받는다
-      if (e.key === 'Escape') { e.preventDefault(); setVerMenu(false); $('verbtn').focus(); }
       return;
     }
-    if (pick.open) return;                       // 피커가 열려 있으면 피커가 먼저 받는다
-    if (e.key === 'Escape' && state.open) { setPanel(false); return; }
+    if (pick.open) {
+      if (e.key === 'Tab' && !$('picker').contains(e.target)) { e.preventDefault(); cycleTab(e.shiftKey); }
+      return;
+    }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
@@ -1762,7 +1914,11 @@ async function boot() {
   window.addEventListener('hashchange', apply);
   // 창이 좁아지면 패널도 따라 줄어든다(본문 640px 을 지키느라). 저장된 폭은 그대로 둔다 —
   // 다시 넓어지면 원래 폭으로 돌아온다.
-  window.addEventListener('resize', () => { setPanelW(storedW()); scheduleRelayout(); });
+  window.addEventListener('resize', () => {
+    setPanelW(storedW()); scheduleRelayout();
+    if (pick.open && !fb.open && (!$('picker').contains(document.activeElement)
+        || !visibleControl(document.activeElement))) $('pick-x').focus();
+  });
 
   if (!location.hash) {
     // 저장된 last 도 해시와 같은 검증을 통과해야 쓴다 (F10). 손상됐으면 창 1.
@@ -1777,6 +1933,7 @@ async function boot() {
   setPanel(ls.get('panel') === '1', false);
   // 검증(헤드리스 CDP)과 다음 스파이크를 위한 디버그 핸들. 앱 동작에는 관여하지 않는다.
   window.__antilego = {
+    get terrain() { return terrain; }, terrainActive,
     state, drawMap, setPanel, anchor, fitFocus, renderPanel, V,
     setEraLayer, renderEra, eraOf, regionsOf,
     setPanelW, saveW, panelMax, relayout, mapSize, scene,

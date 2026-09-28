@@ -78,7 +78,7 @@ ok('메뉴: aria-expanded', s.expanded, 'true');
 ok('메뉴: 네 역본', s.items.map(i => i.id), ['krv', 'kjv', 'bsb', 'esv']);
 ok('메뉴: 이름', s.items.map(i => i.name), ['개역한글', 'King James Version', 'Berean Standard Bible', 'English Standard Version']);
 ok('메뉴: short (이름과 같으면 생략)', s.items.map(i => i.short), [null, 'KJV', 'BSB', 'ESV']);
-ok('메뉴: 온라인 꼬리표는 esv 에만', s.items.map(i => i.tag), [null, null, null, '온라인']);
+ok('메뉴: 온라인 꼬리표는 esv 에만', s.items.map(i => i.tag), [null, null, null, '온라인 · 키 없음']);
 ok('메뉴: 지금 역본에 체크', s.items.map(i => i.checked), ['true', 'false', 'false', 'false']);
 await shot(cdp, `${SHOTS}/b-desktop-menu.png`);
 

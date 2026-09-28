@@ -95,14 +95,14 @@ await tapSel(cdp, '.veritem[data-id="esv"]');
 await sleep(1000);
 s = await snap();
 ok('360: no_key 문구', s.msg, 'ESV API 키가 아직 설정되지 않았습니다');
-ok('360: 되돌아가기 버튼', s.fallback, '개역한글로 보기');
+ok('360: 되돌아가기 버튼', s.fallback, 'KJV로 보기');
 ok('360: 실패 화면도 가로 스크롤 없음', s.scrollW, 360);
 await shot(cdp, `${SHOTS}/b-mobile-esv-nokey.png`);
 await tapSel(cdp, '#ver-fallback');
 await sleep(900);
 s = await snap();
-ok('360: 개역한글로 돌아온다', s.ver, 'krv');
-ok('360: 한글 본문', s.lang, false);
+ok('360: 마지막 정적 역본으로 돌아온다', s.ver, 'kjv');
+ok('360: 영문 본문', s.lang, true);
 
 ok('네트워크 오류는 일부러 만든 /api/esv 실패뿐',
   [...new Set(net.filter(t => !/\/api\/esv/.test(t)))], []);

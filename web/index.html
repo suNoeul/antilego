@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 배포 상태: ESV 키 설정 후 이 content를 빈 문자열로 바꾼다. 실제 응답이 우선한다. -->
+<meta name="antilego-esv-status" content="no_key">
 <title>Antilego — 읽기</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -102,16 +104,33 @@
 <aside id="panel" class="panel" aria-label="지도 패널">
   <div id="grip" class="grip" aria-hidden="true"><span></span></div>
   <div class="panel-in">
-    <div class="map-wrap">
+    <div id="map-wrap" class="map-wrap">
       <svg id="map" class="panel-map"></svg>
+      <div id="terrain-map" class="terrain-map" aria-hidden="true" inert></div>
       <span id="era-badge" class="era-badge" hidden>대략</span>
       <div class="zoom-ctl">
+        <button id="z-terrain" class="zbtn zbtn-txt" type="button" aria-pressed="false"
+                aria-controls="terrain-map" disabled>지형 보기</button>
         <button id="z-era" class="zbtn zbtn-txt" type="button" aria-pressed="false"
                 aria-label="시대 영역 표시">시대</button>
         <button id="z-in" class="zbtn" type="button" aria-label="확대">+</button>
         <button id="z-out" class="zbtn" type="button" aria-label="축소">−</button>
         <button id="z-reset" class="zbtn" type="button" aria-label="원래대로">⟲</button>
       </div>
+    </div>
+    <div class="terrain-meta">
+      <p id="terrain-status" role="status">현대 지형 참고 · 고대 지형 복원 아님</p>
+      <button id="map-mode" type="button">간단 지도</button>
+    </div>
+    <div id="terrain-note" class="terrain-note" hidden>
+      <p class="terrain-help"><span class="terrain-help-touch">두 손가락을 함께 위아래로 · 기울이기</span><span class="terrain-help-mouse">Ctrl + 드래그 · 기울이기 / 회전</span></p>
+      <details class="terrain-sources">
+        <summary>지형 © Mapterhorn · 출처와 한계</summary>
+        <p>높이 배율 1배. 현대 지형을 참고하며 고대 해안선·수위·지형을 복원한 지도가 아닙니다.</p>
+        <p><a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener noreferrer">Mapterhorn 원천별 출처·라이선스</a> · <a href="vendor/maplibre-gl-5.20.0/LICENSE.txt" target="_blank" rel="noopener noreferrer">MapLibre GL JS</a></p>
+        <p>Copernicus DEM © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA. All rights reserved. Accessed via OpenTopography and AWS Open Data.</p>
+        <p>ASTER GDEM courtesy of METI and NASA, processed by 4cast LTD using VTbuilder. TINITALY © INGV, CC BY 4.0. 해안선·강·호수: Natural Earth (Public Domain).</p>
+      </details>
     </div>
     <p id="era-empty" class="era-empty" hidden>이 장은 시대를 특정하지 않아 영역을 표시하지 않습니다</p>
     <div id="place-block" class="place-block"></div>

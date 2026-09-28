@@ -1,4 +1,5 @@
-// 양식화 미니맵 렌더러. 순수 함수 — fetch·전역 상태 없음.
+// 양식화 미니맵 DOM 렌더 어댑터. renderScene은 document를 사용하고 SVG를 변경한다.
+// 순수 계산 API: sceneFrame · frameBounds · clampView · zoomAt (DOM 접근 없음).
 // renderScene(svgEl, scene, layers, tokens, view)
 //   scene  = { focus: [placeId], others: [placeId], places: { id: {ko, lat, lon} },
 //              regions: [GeoJSON Feature] }   ← Spike 03-d. 이 장의 시대 영역.
@@ -136,6 +137,7 @@ export function frameBounds(f, layers) {
   };
 }
 
+// DOM 적용 API: SVG 크기를 실측하고 순수 계산 결과를 실제 노드에 적용한다.
 export function renderScene(svgEl, scene, layers, tokens, view) {
   const t = { ...DEFAULT_TOKENS, ...(tokens || {}) };
   const L = layers || {};
