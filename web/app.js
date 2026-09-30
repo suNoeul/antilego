@@ -453,6 +453,7 @@ function keepCenter(nextW, nextH) {
 let relayoutRaf = 0;
 function relayout() {
   if (!state.open) return;
+  stopViewMove();
   const [w, h] = mapSize();
   if (state.render && (state.render.W !== w || state.render.H !== h)) keepCenter(w, h);
   drawMap();
@@ -475,22 +476,43 @@ function scheduleDraw() {
 // 배율은 건드리지 않고 **최소한으로 이동만** 한다. 라벨 자리가 바뀌면 다시 재어
 // 최대 세 번까지 맞춘다.
 const FIT = 24;
-function fitFocus() {
-  if (terrainActive()) return; // 새 선택은 지형 어댑터가 해당 장소 주변으로 맞춘다.
+let viewMoveRaf = 0;
+function stopViewMove() {
+  cancelAnimationFrame(viewMoveRaf);
+  viewMoveRaf = 0;
+}
+function fitFocus(animate = false) {
+  if (terrainActive()) return; // 지형 어댑터가 화면 밖의 선택만 이동한다.
+  stopViewMove();
+  const start = { ...state.view };
   for (let i = 0; i < 3; i++) {
     const b = state.render?.focusBox;
-    if (!b) return;
+    if (!b) break;
     const W = vw(), H = vh();
     const dx = b[0] < FIT ? FIT - b[0] : (b[2] > W - FIT ? (W - FIT) - b[2] : 0);
     const dy = b[1] < FIT ? FIT - b[1] : (b[3] > H - FIT ? (H - FIT) - b[3] : 0);
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) break;
     const next = clampView(
       { z: state.view.z, px: state.view.px + dx, py: state.view.py + dy },
       state.render.bounds);
-    if (Math.abs(next.px - state.view.px) < 0.5 && Math.abs(next.py - state.view.py) < 0.5) return;
+    if (Math.abs(next.px - state.view.px) < 0.5 && Math.abs(next.py - state.view.py) < 0.5) break;
     state.view = next;
     drawMap();
   }
+  const target = { ...state.view };
+  if (!animate || matchMedia('(prefers-reduced-motion: reduce)').matches
+    || Math.hypot(target.px - start.px, target.py - start.py) < .5) return;
+  const began = performance.now();
+  state.view = start;
+  drawMap();
+  const tick = now => {
+    const t = Math.min(1, (now - began) / 350), k = 1 - (1 - t) ** 3;
+    state.view = { z: target.z, px: start.px + (target.px - start.px) * k,
+      py: start.py + (target.py - start.py) * k };
+    drawMap();
+    viewMoveRaf = t < 1 ? requestAnimationFrame(tick) : 0;
+  };
+  viewMoveRaf = requestAnimationFrame(tick);
 }
 
 // `+` `−` 버튼이 기준으로 삼는 점: 선택된 지명, 없으면 이 장 지명들의 무게중심.
@@ -507,9 +529,9 @@ function anchor() {
   return [Math.max(0, Math.min(vw(), x)), Math.max(0, Math.min(vh(), y))];
 }
 
-function renderPanel() {
+function renderPanel(animate = false) {
   drawMap();
-  fitFocus();          // 선택된 지명이 잘리지 않게 시야를 맞춘다
+  fitFocus(animate);   // 화면 밖의 선택만 배율을 유지하며 이동한다
   renderEra();
   const box = $('place-block');
   box.textContent = '';
@@ -604,6 +626,7 @@ function setPanel(open, remember = true, opener = document.activeElement) {
   if (remember) ls.set('panel', state.open ? '1' : '0');
   if (state.open) renderPanel();
   else {
+    stopViewMove();
     terrain?.stop();
     if (wasOpen && remember) (panelOpener?.isConnected ? panelOpener : $('btn-map')).focus({ preventScroll: true });
   }
@@ -646,7 +669,7 @@ function applySel() {
   for (const b of document.querySelectorAll('.place')) {
     b.setAttribute('aria-pressed', String(b.dataset.p === state.sel));
   }
-  if (state.open) renderPanel();
+  if (state.open) renderPanel(true);
 }
 
 function showMsg(text) {
@@ -771,6 +794,7 @@ function lastValidRef() {
 }
 
 async function apply() {
+  stopViewMove();
   const r = parseHash();
   // 형식이 맞아도 없는 권·범위 밖 장이면 상태에도 localStorage 에도 넣지 않는다 (F10).
   if (!r || !isValidRef(state.index, r.book, r.ch)) {
@@ -781,7 +805,6 @@ async function apply() {
     return;
   }
   const changed = r.book !== state.book || r.ch !== state.ch;
-  const selChanged = r.sel !== state.sel;
   state.book = r.book; state.ch = r.ch;
   state.sel = r.sel;
 
@@ -797,7 +820,7 @@ async function apply() {
   } else {
     syncNav();
   }
-  if (changed || selChanged) resetView();   // 새 장면 → 확대 초기화
+  if (changed) resetView();   // 같은 장의 지명 선택은 사용자의 확대·이동을 유지한다.
   applySel();
   pickSync();
   // 성경 찾기에서 절을 골라 장을 옮겨 온 경우, 그 장이 그려진 지금 스크롤한다.
@@ -822,6 +845,7 @@ function bindMapGestures() {
   };
 
   svg.addEventListener('wheel', e => {
+    stopViewMove();
     e.preventDefault();
     const [cx, cy] = toView(e.clientX, e.clientY);
     state.view = zoomAt(state.view, cx, cy, Math.exp(-e.deltaY * 0.0022), state.render?.bounds);
@@ -829,6 +853,7 @@ function bindMapGestures() {
   }, { passive: false });
 
   svg.addEventListener('dblclick', e => {
+    stopViewMove();
     e.preventDefault();
     const [cx, cy] = toView(e.clientX, e.clientY);
     state.view = zoomAt(state.view, cx, cy, 1.8, state.render?.bounds);
@@ -839,6 +864,7 @@ function bindMapGestures() {
   const pts = new Map();
   let last = null, pinch = null;
   svg.addEventListener('pointerdown', e => {
+    stopViewMove();
     svg.setPointerCapture?.(e.pointerId);
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pts.size === 1) { last = { x: e.clientX, y: e.clientY }; pinch = null; }
@@ -882,6 +908,7 @@ function bindMapGestures() {
   svg.addEventListener('pointercancel', up);
 
   const zoomBtn = f => () => {
+    stopViewMove();
     if (terrainActive()) { terrain.zoom(Math.log2(f)); return; }
     const [ax, ay] = anchor();
     state.view = zoomAt(state.view, ax, ay, f, state.render?.bounds);
@@ -890,11 +917,13 @@ function bindMapGestures() {
   $('z-in').addEventListener('click', zoomBtn(1.6));
   $('z-out').addEventListener('click', zoomBtn(1 / 1.6));
   $('z-reset').addEventListener('click', () => {
+    stopViewMove();
     if (terrainActive()) { terrain.fit(); return; }
     resetView(); drawMap(); fitFocus();
   });
   $('z-terrain').addEventListener('click', () => { if (terrainActive()) terrain.tilt(); });
   $('map-mode').addEventListener('click', () => {
+    stopViewMove();
     simpleMap = !(simpleMap || terrainFailed);
     ls.set('mapMode', simpleMap ? 'simple' : 'terrain');
     terrainFailed = false;
@@ -902,7 +931,7 @@ function bindMapGestures() {
     drawMap();
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) terrain?.stop();
+    if (document.hidden) { stopViewMove(); terrain?.stop(); }
     else if (state.open) { ensureTerrain(); terrain?.resize(); }
   });
 }

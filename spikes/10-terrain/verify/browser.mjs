@@ -32,6 +32,7 @@ try {
   await c.send('Fetch.enable', { patterns: [{ urlPattern: 'https://*' }] });
   await c.send('Page.navigate', { url: 'about:blank' });
   await c.send('Storage.clearDataForOrigin', { origin: 'http://127.0.0.1:8765', storageTypes: 'all' });
+  await c.send('Runtime.discardConsoleEntries'); c.events.length = 0;
   await metrics(c, { width: 1400, height: 950, mobile: false });
   await c.send('Page.navigate', { url: 'http://127.0.0.1:8765/#Josh.10' });
   await wait('window.__antilego?.state.data');
@@ -45,12 +46,13 @@ try {
   check(await js('return __antilego.terrain.map.getPitch() === 0'), '기본 위에서 보기');
   check(await js('return __antilego.terrain.map.getTerrain().exaggeration === 1'), '실제 높이 배율 1');
   await js('window.__mapBefore = __antilego.terrain.map; __antilego.setPanelW(640); __antilego.relayout();');
+  const selectionZoom = await js('return __antilego.terrain.map.getZoom()');
   const id = await js('return Object.keys(__antilego.state.places).find(k => __antilego.state.places[k].en === "Jerusalem")');
   await js(`location.hash = '#Josh.10/${id}'`);
   await wait(`__antilego.terrain.key === 'Josh.10/${id}'`);
   await sleep(1300);
   check(await js('return __antilego.terrain.map === window.__mapBefore'), '선택 변경 시 지도 재사용');
-  check(await js('return __antilego.terrain.map.getZoom() > 8'), '선택한 지명 주변으로 확대');
+  check(await js(`return Math.abs(__antilego.terrain.map.getZoom() - ${selectionZoom}) < .001`), '선택 변경 시 확대 비율 유지');
   check(await js('return getComputedStyle(document.querySelector(".terrain-label.is-focus")).visibility === "visible"'), '선택 지명 라벨 표시');
   check(await js('const a=document.getElementById("terrain-map").getBoundingClientRect(), b=document.getElementById("map").getBoundingClientRect();return Math.abs(a.top-b.top)<1 && Math.abs(a.height-b.height)<1'), 'SVG·지형 캔버스 정렬');
   await snapshot('desktop-flat');
@@ -73,7 +75,8 @@ try {
   await c.send('Input.dispatchMouseEvent', { type:'mouseReleased', x:x+32, y:y-72, button:'left', modifiers:2, clickCount:1 });
   await sleep(300);
   check(await js('return __antilego.terrain.map.getPitch() > 5'), '실제 Ctrl+드래그 기울이기');
-  await clickSel(c, '#z-reset'); await sleep(450);
+  await clickSel(c, '#z-reset'); await wait('!__antilego.terrain.map.isMoving()');
+  console.log('METRIC reset camera:', await js('return [__antilego.terrain.map.getBearing(), __antilego.terrain.map.getPitch()]'));
   check(await js('return Math.abs(__antilego.terrain.map.getBearing()) < .01 && __antilego.terrain.map.getPitch() === 0'), '초기화는 북쪽·평면 복귀');
   await clickSel(c, '#z-era'); await sleep(300);
   check(await js('return __antilego.terrain.map.getSource("regions").serialize().data.features.length > 0'), '기존 시대 영역 연결');
@@ -106,6 +109,7 @@ try {
   await js('location.hash = "#Gen.1"');
   await wait('__antilego.state.book === "Gen" && __antilego.terrain?.key === "Gen.1/"');
   check(await js('return __antilego.terrain.map.getSource("regions").serialize().data.features.length === 0'), '원시사 시대 영역 생성 안 함');
+  check(await js('const p=__antilego.terrain.map.getCenter();return Math.abs(p.lng-35.2)<.05&&Math.abs(p.lat-31.8)<.2'), '새 장으로 이동할 때는 기존처럼 해당 장의 첫 범위 표시');
 
   await clickSel(c, '#map-mode');
   check(await js('return !__antilego.terrain && !document.getElementById("map-wrap").classList.contains("terrain-ready")'), '간단 지도 선택 시 GPU 해제·SVG 복귀');

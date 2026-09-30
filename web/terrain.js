@@ -10,18 +10,54 @@ const valid = p => p && Number.isFinite(p.lon) && Number.isFinite(p.lat)
   && p.lon >= 8 && p.lon <= 50 && p.lat >= 24 && p.lat <= 43;
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// DOM 없는 계산: 선택 지명은 근경, 장 전체는 모든 지명을 담는 범위.
+// 최초 열기·새 장·명시적 초기화의 범위. 선택 지명과 같은 장의 가까운 지명을 함께 담는다.
 export function sceneBounds(scene) {
   const focus = (scene.focus || []).map(id => scene.places[id]).filter(valid);
-  const points = focus.length ? focus : (scene.others || []).map(id => scene.places[id]).filter(valid);
+  const others = (scene.others || []).map(id => scene.places[id]).filter(valid);
+  const points = focus.length ? [...focus, ...others.filter(p => focus.some(f =>
+    Math.abs(p.lon - f.lon) <= .15 && Math.abs(p.lat - f.lat) <= .12))] : others;
   if (!points.length) return [[34.7, 31.3], [35.7, 32.3]];
   const lons = points.map(p => p.lon), lats = points.map(p => p.lat);
   const x = (Math.min(...lons) + Math.max(...lons)) / 2;
   const y = (Math.min(...lats) + Math.max(...lats)) / 2;
-  const dx = Math.max(focus.length ? .13 : .3, (Math.max(...lons) - Math.min(...lons)) * .65);
-  const dy = Math.max(focus.length ? .1 : .22, (Math.max(...lats) - Math.min(...lats)) * .65);
+  const dx = Math.max(.045, (Math.max(...lons) - Math.min(...lons)) * .65);
+  const dy = Math.max(.035, (Math.max(...lats) - Math.min(...lats)) * .65);
   return [[Math.max(8, x - dx), Math.max(24, y - dy)],
     [Math.min(50, x + dx), Math.min(43, y + dy)]];
+}
+
+// 화면의 이름만 옮긴다. 점은 실제 좌표에 유지하는 DOM 없는 라벨 배치 계산.
+export function placeLabels(items, width, height) {
+  const boxes = [], result = new Map();
+  const intersects = (a, b, gap = 4) => a[0] < b[2] + gap && a[2] > b[0] - gap
+    && a[1] < b[3] + gap && a[3] > b[1] - gap;
+  const inside = b => b[0] >= 8 && b[1] >= 8 && b[2] <= width - 8 && b[3] <= height - 46;
+  const points = items.filter(m => !m.region).map(m => [m.x - 5, m.y - 5, m.x + 5, m.y + 5]);
+  for (const m of [...items].sort((a, b) => Number(a.region) - Number(b.region)
+    || Number(b.focus) - Number(a.focus))) {
+    let picked = null;
+    for (const gap of [10, 24, 42, 64]) {
+      const offsets = [[-m.w / 2, -gap - m.h], [gap, -m.h / 2], [-m.w / 2, gap],
+        [-gap - m.w, -m.h / 2], [gap, -gap - m.h], [-gap - m.w, -gap - m.h],
+        [gap, gap], [-gap - m.w, gap]];
+      for (const [dx, dy] of offsets) {
+        const b = [m.x + dx, m.y + dy, m.x + dx + m.w, m.y + dy + m.h];
+        if (inside(b) && !boxes.some(r => intersects(b, r)) && !points.some(r => intersects(b, r, 2))) {
+          picked = b; break;
+        }
+      }
+      if (picked) break;
+    }
+    // 공간이 부족해도 선택 이름은 남긴다. 나머지는 점·접근성 이름을 유지한다.
+    if (!picked && m.focus && width >= m.w + 16 && height >= m.h + 54) {
+      const x = Math.max(8, Math.min(width - m.w - 8, m.x - m.w / 2));
+      const y = Math.max(8, Math.min(height - m.h - 46, m.y - m.h - 10));
+      picked = [x, y, x + m.w, y + m.h];
+    }
+    if (picked) boxes.push(picked);
+    result.set(m.id, picked);
+  }
+  return result;
 }
 
 export function terrainStyle(layers, colors, regions = []) {
@@ -164,15 +200,41 @@ class TerrainMap {
   update(scene, key, force = false) {
     if (this.disposed) return;
     const changed = this.key !== key;
-    const overlays = force || changed || this.scene.regions !== scene.regions;
+    const chapterChanged = this.key.split('/')[0] !== key.split('/')[0];
+    const overlays = force || this.scene.regions !== scene.regions;
+    const ids = s => [...new Set([...(s.focus || []), ...(s.others || [])])].sort().join('|');
+    const labels = force || overlays || ids(this.scene) !== ids(scene) || this.scene.places !== scene.places;
     this.scene = scene;
     this.key = key;
     if (!this.loaded) return;
-    if (overlays) {
-      this.map.getSource('regions').setData(regionData(scene.regions || []));
-      this.makeLabels();
+    if (overlays) this.map.getSource('regions').setData(regionData(scene.regions || []));
+    if (labels) this.makeLabels();
+    else this.selectLabels();
+    if (force || chapterChanged) this.fit(false);
+    else if (changed && this.options.isOpen()) this.revealSelection();
+  }
+
+  selectLabels() {
+    for (const m of this.markers) {
+      m.focus = !!m.id && (this.scene.focus || []).includes(m.id);
+      m.el.classList.toggle('is-focus', m.focus);
+      if (m.id) m.el.setAttribute('aria-pressed', String(m.focus));
     }
-    if (changed || force) this.fit(false);
+    this.layoutLabels();
+  }
+
+  revealSelection() {
+    const id = this.scene.focus?.[0];
+    const p = this.scene.places[id];
+    // 연속 선택은 앞의 이동을 멈추고 최신 선택만 따른다.
+    this.map.stop();
+    if (!valid(p)) return; // 같은 장에서 선택만 해제하면 시점을 초기화하지 않는다.
+    const pt = this.map.project([p.lon, p.lat]);
+    const { clientWidth: w, clientHeight: h } = this.options.container;
+    if (pt.x >= 32 && pt.x <= w - 32 && pt.y >= 32 && pt.y <= h - 56) return;
+    this.map.easeTo({ center: [p.lon, p.lat], zoom: this.map.getZoom(),
+      pitch: this.map.getPitch(), bearing: this.map.getBearing(),
+      duration: reducedMotion() ? 0 : 400 });
   }
 
   makeLabels() {
@@ -185,14 +247,16 @@ class TerrainMap {
       name.textContent = text;
       el.append(name);
       if (id) {
+        el.dataset.place = id;
+        el.title = text;
         el.type = 'button';
         el.setAttribute('aria-label', text + ' 위치 선택');
         el.setAttribute('aria-pressed', String(focus));
         el.addEventListener('click', e => { e.stopPropagation(); this.options.onSelect(id); });
       }
-      const marker = new this.lib.Marker({ element: el, anchor: 'bottom', offset: [0, -3] })
+      const marker = new this.lib.Marker({ element: el, anchor: 'center' })
         .setLngLat(at).addTo(this.map);
-      this.markers.push({ marker, el, focus, at });
+      this.markers.push({ marker, el, name, focus, at, id, region, layoutId: this.markers.length });
     };
     const { focus = [], others = [], places = {}, regions = [] } = this.scene;
     [...new Set([...focus, ...others])].forEach(id => {
@@ -210,23 +274,33 @@ class TerrainMap {
   layoutLabels() {
     if (this.disposed || !this.options.isOpen()) return;
     const bounds = this.options.container.getBoundingClientRect();
-    const placed = [];
-    // 점·글자를 한 묶음으로 숨긴다. 선택 지명 > 이 장의 지명 > 시대 이름.
+    // Marker가 지형 높이를 반영해 배치한 점을 기준으로 이름만 배치한다.
+    const visible = [];
     for (const m of this.markers) {
       const r = m.el.getBoundingClientRect();
-      const inside = r.left >= bounds.left + 8 && r.right <= bounds.right - 8
-        && r.top >= bounds.top + 8 && r.bottom <= bounds.bottom - 46;
-      const collision = placed.some(b => r.left < b.right + 4 && r.right > b.left - 4
-        && r.top < b.bottom + 4 && r.bottom > b.top - 4);
-      const show = inside && (m.focus || !collision);
-      m.el.style.visibility = show ? '' : 'hidden';
-      if (show) placed.push(r);
+      const x = r.left + r.width / 2 - bounds.left, y = r.top + r.height / 2 - bounds.top;
+      const inside = x >= 4 && x <= bounds.width - 4 && y >= 4 && y <= bounds.height - 40;
+      m.el.style.visibility = inside ? '' : 'hidden';
+      if (inside) visible.push({ ...m, id: m.layoutId, x, y, w: m.name.offsetWidth, h: m.name.offsetHeight });
+      else { m.name.style.visibility = 'hidden'; m.el.style.setProperty('--leader-length', '0px'); }
+    }
+    const positions = placeLabels(visible, bounds.width, bounds.height);
+    for (const m of visible) {
+      const b = positions.get(m.id);
+      m.name.style.visibility = b ? '' : 'hidden';
+      if (m.region) m.el.style.visibility = b ? '' : 'hidden';
+      if (!b) { m.el.style.setProperty('--leader-length', '0px'); continue; }
+      m.name.style.transform = `translate(${b[0] - m.x}px, ${b[1] - m.y}px)`;
+      const dx = Math.max(b[0], Math.min(b[2], m.x)) - m.x;
+      const dy = Math.max(b[1], Math.min(b[3], m.y)) - m.y;
+      m.el.style.setProperty('--leader-length', m.region ? '0px' : Math.hypot(dx, dy) + 'px');
+      m.el.style.setProperty('--leader-angle', Math.atan2(dy, dx) + 'rad');
     }
   }
 
   fit(animate = true) {
     this.map.fitBounds(sceneBounds(this.scene), {
-      padding: { top: 42, bottom: 60, left: 35, right: 35 }, maxZoom: 10,
+      padding: { top: 42, bottom: 60, left: 35, right: 35 }, maxZoom: 12,
       pitch: 0, bearing: 0, duration: animate && !reducedMotion() ? 300 : 0,
     });
   }

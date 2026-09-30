@@ -15,8 +15,8 @@
 //            점 크기와 글자 크기는 화면에서 항상 같고, 확대하면 겹침이 풀려
 //            숨어 있던 라벨이 되살아난다(LOD).
 //
-// 규칙 (Spike 02-b): **이름 없는 점은 그리지 않는다.** 라벨을 놓지 못한 non-focus
-// 지명은 점도 그리지 않는다. focus 는 언제나 그린다.
+// 지명 비교(2026-09-30): 라벨이 겹쳐도 위치 점은 보존한다. 이름만 주변에 배치하고
+// 연결선으로 좌표를 가리킨다. 시대 영역의 이름 없는 표시는 계속 숨긴다.
 
 // viewBox 크기는 상수가 아니라 **SVG 에서 잰 픽셀 값**이다 (02-c).
 // SVG 를 픽셀 크기로 그린다(viewBox = 0 0 w h, width/height 속성 = w/h) → 글자도 점도
@@ -25,7 +25,7 @@
 export const DEF_W = 320, DEF_H = 240;   // 크기를 못 재면 쓰는 기본값 (4:3)
 export const ZOOM_MIN = 1, ZOOM_MAX = 8;
 
-const MIN_DEG = 1.8;             // 최소 폭 200km ≈ 위도 1.8°
+const MIN_DEG = .12;             // 가까운 지명의 관계를 읽을 수 있는 최소 폭
 const PAD = 0.25;                // 양쪽 25% 패딩
 const SVG = 'http://www.w3.org/2000/svg';
 const CLAMP = 20000;             // 화면 밖 좌표 잘라내기 (SVG가 clip)
@@ -199,9 +199,7 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   addGeo(L.lakes, { fill: t.sea, stroke: t.coast, 'stroke-width': 0.6, 'stroke-linejoin': 'round' });
   addGeo(L.rivers, { fill: 'none', stroke: t.river, 'stroke-width': 1, 'stroke-linecap': 'round' });
 
-  // --- 5. 점 + 라벨을 함께 결정한다 ---
-  // 라벨 자리는 아래 → 위 → 오른쪽 → 왼쪽 순으로 찾는다. 네 자리 모두
-  // 화면(여백 EDGE) 밖으로 나가거나 이미 놓인 라벨과 겹치면 **점도 라벨도 그리지 않는다.**
+  // --- 5. 지명 점을 보존하고 라벨만 주변 빈 자리로 옮긴다 ---
   // focus 는 예외 — 자리를 못 찾아도 아래쪽에 그대로 놓는다(app.js 가 시야를 맞춘다).
   const boxes = [];
   const drawn = [];
@@ -237,7 +235,7 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
     const rad = bold ? R_FOCUS : R_DOT;
     const text = p.ko || p.en || id;
     const bw = text.length * size * 0.92, bh = size * 1.25;
-    const cands = around(x, y, rad, size);
+    const cands = [0, 18, 36, 54].flatMap(extra => around(x, y, rad + extra, size));
     let pick = bold
       ? (() => {                                  // focus 는 겹쳐도 그린다
         for (const [anchor, tx, ty] of cands) {
@@ -248,12 +246,16 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
       })()
       : fit(cands, bw, bh);
     if (!pick) {
-      if (!bold) return;                          // 이름 없는 점은 그리지 않는다
+      if (!bold) {
+        if (x >= EDGE && x <= W - EDGE && y >= EDGE && y <= H - EDGE)
+          drawn.push({ id, x, y, rad, bold, size, text });
+        return;
+      }
       const [anchor, tx, ty] = cands[0];
       pick = { anchor, tx, ty, b: boxOf(anchor, tx, ty, bw, bh) };
     }
     boxes.push(pick.b);
-    drawn.push({ x, y, rad, bold, size, text, ...pick });
+    drawn.push({ id, x, y, rad, bold, size, text, ...pick });
     if (bold && !focusBox) {
       focusBox = [
         Math.min(pick.b[0], x - rad), Math.min(pick.b[1], y - rad),
@@ -313,13 +315,24 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
     svgEl.append(n);
   }
 
-  // 점을 먼저 전부, 그 다음 라벨 — 라벨이 점 위로 온다.
+  // 연결선 → 점 → 이름. 실제 지명 좌표는 바꾸지 않는다.
   for (const d of drawn) {
-    svgEl.append(el('circle', {
-      cx: r1(d.x), cy: r1(d.y), r: d.rad, fill: d.bold ? t.dot : t.dotDim,
-    }));
+    if (!d.b) continue;
+    svgEl.append(el('line', { x1: r1(d.x), y1: r1(d.y),
+      x2: r1(Math.max(d.b[0], Math.min(d.b[2], d.x))),
+      y2: r1(Math.max(d.b[1], Math.min(d.b[3], d.y))),
+      stroke: t.coast, 'stroke-width': .6, 'pointer-events': 'none' }));
   }
   for (const d of drawn) {
+    const dot = el('circle', {
+      cx: r1(d.x), cy: r1(d.y), r: d.rad, fill: d.bold ? t.dot : t.dotDim,
+      'data-place': d.id,
+    });
+    const title = el('title', {}); title.textContent = d.text; dot.append(title);
+    svgEl.append(dot);
+  }
+  for (const d of drawn) {
+    if (!d.b) continue;
     const n = el('text', {
       x: r1(d.tx), y: r1(d.ty), fill: t.label, 'text-anchor': d.anchor,
       'font-size': d.size, 'font-weight': d.bold ? 700 : 400,
@@ -334,7 +347,7 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   // project 는 확대 버튼이 '지명이 모인 자리'를 기준으로 확대할 수 있게,
   // bounds·focusBox 는 app.js 가 이동 한계와 focus 시야를 맞출 수 있게 돌려준다.
   return {
-    view: v, labels: drawn.length, shown: shown.length, project: P, bounds, focusBox,
+    view: v, labels: drawn.filter(d => d.b).length, shown: shown.length, project: P, bounds, focusBox,
     // 지금 그린 화면 크기와 틀. app.js 가 리사이즈 때 중심을 붙들고, 조작 좌표를 잰다.
     W, H, x0, y0, su,
     // 시대 영역: 데이터가 몇 개고 그중 몇 개가 실제로 그려졌는지(라벨 자리·화면 밖 때문에 준다)
