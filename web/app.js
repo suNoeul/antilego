@@ -4,6 +4,7 @@ import { renderScene, clampView, zoomAt, sceneFrame, BASE_VIEW, DEF_W, DEF_H }
   from './map.js?v=__V__';
 // 권 경계 이동과 해시 검증은 DOM 없는 순수 함수로 뺐다 (06-b, 리뷰 F3·F10).
 import { stepRef, isValidRef } from './nav.js?v=__V__';
+import { regionLabels } from './region-labels.js?v=__V__';
 
 // 배포 버전. GitHub Pages 워크플로가 __V__ 를 커밋 SHA 앞 7자리로 바꾼다.
 // 로컬에서는 바뀌지 않은 채로도 그냥 동작한다 (그냥 쿼리 문자열이다).
@@ -42,7 +43,7 @@ const state = {
   panelW: 400,                                   // 패널 폭(02-c). ≥1200px 에서만 바뀐다
   view: { ...BASE_VIEW },                        // 지도 확대·이동
   // 시대 (Spike 03-d). 못 받으면 전부 null 인 채로 조용히 동작한다 — 캡션도 레이어도 없다.
-  eras: null, chapterEras: null, regionsByEra: null,
+  eras: null, chapterEras: null, regionsByEra: null, labelsByEra: null,
   eraLayer: false,                               // 시대 영역 레이어. 기본 꺼짐
   pendingVerse: null,                            // 성경 찾기에서 고른 절 (장 이동 후 스크롤)
 };
@@ -367,12 +368,14 @@ function goReplace(book, ch) {
 // --- 장면 ---
 function scene() {
   const pid = state.sel;
+  const era = eraOf(state.book, state.ch);
   const inCh = (state.data?.places || []).map(x => x.p).filter(p => state.places[p]);
   return {
     focus: pid && state.places[pid] ? [pid] : [],
     others: inCh.filter(p => p !== pid),
     places: state.places,
-    regions: state.eraLayer ? regionsOf(eraOf(state.book, state.ch)) : NO_REGIONS,
+    regions: state.eraLayer ? regionsOf(era) : NO_REGIONS,
+    contextLabels: (!era?.undated && state.labelsByEra?.[era?.id]) || NO_REGIONS,
   };
 }
 
@@ -603,6 +606,7 @@ function renderEra() {
   // 레이어를 켰을 때만: 지도 왼쪽 위 `대략` 배지, 그리고 그릴 영역이 없으면 한 줄 안내.
   // 시대 데이터를 못 받았으면 둘 다 띄우지 않는다 — 이유가 다른 안내를 대신 띄우지 않는다.
   const has = !!state.eras;
+  $('region-context-note').hidden = !(state.labelsByEra?.[era?.id]?.length);
   $('era-badge').hidden = !(state.eraLayer && has);
   $('era-empty').hidden = !(state.eraLayer && has && era && regions.length === 0);
 }
@@ -1889,8 +1893,10 @@ async function boot() {
     for (const f of regions.features || []) {
       (state.regionsByEra[f.properties.era] ||= []).push(f);
     }
+    state.labelsByEra = Object.fromEntries(Object.values(state.eras).map(era =>
+      [era.id, regionLabels(era, state.regionsByEra)]));
   } catch {
-    state.eras = null; state.chapterEras = null; state.regionsByEra = null;
+    state.eras = null; state.chapterEras = null; state.regionsByEra = null; state.labelsByEra = null;
   }
   renderAttr(attrItems(state.attr));
 

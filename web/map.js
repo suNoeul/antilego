@@ -1,4 +1,6 @@
 // 양식화 미니맵 DOM 렌더 어댑터. renderScene은 document를 사용하고 SVG를 변경한다.
+import { regionOpacity, layoutRegionLabels, REGION_FONT_SIZE, REGION_LETTER_SPACING }
+  from './region-labels.js?v=__V__';
 // 순수 계산 API: sceneFrame · frameBounds · clampView · zoomAt (DOM 접근 없음).
 // renderScene(svgEl, scene, layers, tokens, view)
 //   scene  = { focus: [placeId], others: [placeId], places: { id: {ko, lat, lon} },
@@ -270,7 +272,7 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   // 우선순위가 낮다(겹치면 지명이 이긴다). 자리를 못 찾으면 그리지 않는다 —
   // blob 은 이름 없이 색만 남고, label_only 는 아예 사라진다(이름 없는 표시는 없다).
   const regionDrawn = [];
-  for (const f of regions) {
+  for (const f of scene.contextLabels ? [] : regions) {
     const pr = f.properties;
     const mark = pr.render === 'label_only';
     const at = mark
@@ -315,6 +317,24 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
     svgEl.append(n);
   }
 
+  // 배경 이름은 영역 토글과 독립적이다. 본문 라벨·점과 겹치면 배경이 양보한다.
+  const contextOpacity = regionOpacity(s);
+  const placeNames = new Set(drawn.filter(d => d.x >= 0 && d.x <= W && d.y >= 0 && d.y <= H).map(d => d.text));
+  const contextItems = contextOpacity > .01 ? (scene.contextLabels || []).filter(m => !placeNames.has(m.label)).map(m => {
+    const [x, y] = P(...m.at);
+    return { ...m, x, y, w: m.label.length * (REGION_FONT_SIZE + REGION_LETTER_SPACING), h: 20 };
+  }) : [];
+  const contextPositions = layoutRegionLabels(contextItems, W, H,
+    boxes.concat(drawn.map(d => [d.x - 6, d.y - 6, d.x + 6, d.y + 6])));
+  const contextNames = [];
+  for (const m of contextItems) {
+    const b = contextPositions.get(m.key);
+    if (!b) continue;
+    const n = el('text', { x: r1((b[0] + b[2]) / 2), y: r1(b[1] + 15),
+      class: 'context-label', 'data-region': m.key, 'text-anchor': 'middle', opacity: contextOpacity });
+    n.textContent = m.label; svgEl.append(n); contextNames.push(m.label);
+  }
+
   // 연결선 → 점 → 이름. 실제 지명 좌표는 바꾸지 않는다.
   for (const d of drawn) {
     if (!d.b) continue;
@@ -343,13 +363,14 @@ export function renderScene(svgEl, scene, layers, tokens, view) {
   }
 
   const names = shown.map(id => all[id].ko || id).join(', ');
-  svgEl.setAttribute('aria-label', names ? `지도: ${names}` : '지도');
+  svgEl.setAttribute('aria-label', (names ? `지도: ${names}` : '지도')
+    + (contextNames.length ? `. 주변 나라·지역의 대략적 위치: ${contextNames.join(', ')}` : ''));
   // project 는 확대 버튼이 '지명이 모인 자리'를 기준으로 확대할 수 있게,
   // bounds·focusBox 는 app.js 가 이동 한계와 focus 시야를 맞출 수 있게 돌려준다.
   return {
     view: v, labels: drawn.filter(d => d.b).length, shown: shown.length, project: P, bounds, focusBox,
     // 지금 그린 화면 크기와 틀. app.js 가 리사이즈 때 중심을 붙들고, 조작 좌표를 잰다.
-    W, H, x0, y0, su,
+    W, H, x0, y0, su, contextLabels: contextNames.length,
     // 시대 영역: 데이터가 몇 개고 그중 몇 개가 실제로 그려졌는지(라벨 자리·화면 밖 때문에 준다)
     regions: {
       blobs: blobs.length, marks: marks.length,

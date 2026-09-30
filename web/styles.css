@@ -14,6 +14,7 @@
   --terrain-accent: #b5aa8b;
   /* 시대 영역 (Spike 03-d). 2~3색 순환 + 지명 라벨보다 옅은 회갈색 이름. */
   --label-dim: #7d6f5c;
+  --context-label: #6f6556;
   --region-a: rgba(201, 162, 39, .26);
   --region-a-line: rgba(146, 112, 18, .75);
   --region-b: rgba(125, 138, 63, .24);
@@ -63,6 +64,7 @@
   --terrain-highlight: #777461;
   --terrain-accent: #414539;
   --label-dim: #a09384;
+  --context-label: #c8bca9;
   --region-a: rgba(214, 180, 88, .22);
   --region-a-line: rgba(214, 180, 88, .62);
   --region-b: rgba(152, 168, 98, .20);
@@ -471,6 +473,16 @@ body.panel-open .fabs { right: var(--panel-w); }
 .terrain-label.is-region span { background: transparent; box-shadow: none; text-shadow: 0 1px 2px var(--land); }
 .terrain-label.is-region::after { display: none; }
 .terrain-label:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* 나라·지역은 도시 핀이 아닌 배경 이름. 클릭/드래그를 가로채지 않는다. */
+.terrain-context { width: 0; height: 0; pointer-events: none; }
+.terrain-context span, .context-label {
+  font: 400 14px/20px "Noto Serif KR", "AppleMyungjo", "Batang", serif; letter-spacing: .8px;
+  color: var(--context-label); fill: var(--context-label);
+  text-shadow: 0 1px 2px var(--land); pointer-events: none;
+  transition: none; animation: none;
+}
+.terrain-context span { position: absolute; display: block; white-space: nowrap; width: max-content; }
+.region-context-note { margin: 5px 0 0; font: 10px/1.6 var(--sans); color: var(--label-dim); }
 .terrain-meta { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; margin-top: 8px; }
 .terrain-meta p, .terrain-note p { margin: 0; }
 .terrain-meta, .terrain-note { font-size: 10px; line-height: 1.6; color: var(--muted); }

@@ -1,5 +1,6 @@
 // Spike 10: 지형 렌더 어댑터. 본문·해시·시대 판정은 app.js가 소유한다.
 // 외부 지도 스타일/도로/위성/OSM 없이 기존 Natural Earth + 공개 DEM만 사용한다.
+import { regionOpacity, layoutRegionLabels } from './region-labels.js?v=__V__';
 export const TERRAIN_BOUNDS = [8, 24, 50, 43];
 export const MAX_PITCH = 55;
 export const DEM_URL = 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp';
@@ -146,6 +147,7 @@ class TerrainMap {
     this.ready = false;
     this.disposed = false;
     this.markers = [];
+    this.contextMarkers = [];
     this.scene = options.scene;
     this.key = options.key;
     this.map = new lib.Map({
@@ -157,6 +159,7 @@ class TerrainMap {
       pitchWithRotate: true, touchPitch: true, fadeDuration: 0,
     });
     this.map.getCanvas().setAttribute('aria-label', '지형 지도. 방향키로 이동, 더하기·빼기로 확대·축소. 지형 보기 버튼으로 기울이기');
+    this.map.getCanvas().setAttribute('aria-describedby', 'region-context-note');
     // 키보드와 별도 버튼을 모두 제공한다. 제스처를 모르는 사용자도 같은 화면을 볼 수 있다.
     this.map.on('load', () => {
       if (this.disposed) return;
@@ -173,6 +176,7 @@ class TerrainMap {
     this.map.on('move', () => { this.layoutLabels(); options.onChange(this); });
     this.map.on('render', () => this.layoutLabels());
     this.map.on('idle', () => this.layoutLabels());
+    document.fonts?.ready.then(() => this.layoutLabels());
     // 초기 지형이 끝없이 대기해도 읽기를 막지 않는다.
     this.timer = setTimeout(() => this.fail(), 15000);
     this.fit(false);
@@ -202,12 +206,14 @@ class TerrainMap {
     const changed = this.key !== key;
     const chapterChanged = this.key.split('/')[0] !== key.split('/')[0];
     const overlays = force || this.scene.regions !== scene.regions;
+    const contextChanged = force || this.scene.contextLabels !== scene.contextLabels;
     const ids = s => [...new Set([...(s.focus || []), ...(s.others || [])])].sort().join('|');
     const labels = force || overlays || ids(this.scene) !== ids(scene) || this.scene.places !== scene.places;
     this.scene = scene;
     this.key = key;
     if (!this.loaded) return;
     if (overlays) this.map.getSource('regions').setData(regionData(scene.regions || []));
+    if (contextChanged) this.makeContextLabels();
     if (labels) this.makeLabels();
     else this.selectLabels();
     if (force || chapterChanged) this.fit(false);
@@ -263,12 +269,49 @@ class TerrainMap {
       const p = places[id];
       if (valid(p)) add([p.lon, p.lat], p.ko || p.en || id, focus.includes(id), id);
     });
-    for (const f of regions) {
+    for (const f of this.scene.contextLabels ? [] : regions) {
       const p = f.properties;
       const at = p?.render === 'label_only' && f.geometry?.type === 'Point' ? f.geometry.coordinates : p?.rep;
       if (at && p?.polity_ko) add(at, p.polity_ko + ' · 대략', false, null, true);
     }
     this.layoutLabels();
+  }
+
+  makeContextLabels() {
+    this.contextMarkers.forEach(m => m.marker.remove());
+    this.contextMarkers = (this.scene.contextLabels || []).map(item => {
+      const el = document.createElement('div'), name = document.createElement('span');
+      el.className = 'terrain-context';
+      el.dataset.region = item.key;
+      name.textContent = item.label;
+      el.append(name);
+      // 나라 이름은 위치 핀이 아니므로 산 뒤 가림에 따른 진하기 변화도 적용하지 않는다.
+      const marker = new this.lib.Marker({ element: el, anchor: 'center', opacity: '1', opacityWhenCovered: '1' })
+        .setLngLat(item.at).addTo(this.map);
+      return { ...item, el, name, marker };
+    });
+  }
+
+  layoutContextLabels(bounds, occupied, visiblePlaces) {
+    const lat = this.map.getCenter().lat;
+    const scale = 512 * 2 ** this.map.getZoom() / (360 * Math.cos(lat * Math.PI / 180));
+    const opacity = regionOpacity(scale);
+    const names = new Set(visiblePlaces.filter(m => !m.region).map(m => m.name.textContent));
+    const candidates = this.contextMarkers.filter(m => opacity > .01 && !names.has(m.label)).map(m => {
+      const r = m.el.getBoundingClientRect();
+      return { ...m, x: r.left - bounds.left, y: r.top - bounds.top,
+        w: m.name.offsetWidth, h: m.name.offsetHeight };
+    });
+    const positions = layoutRegionLabels(candidates, bounds.width, bounds.height, occupied);
+    for (const m of this.contextMarkers) {
+      const b = positions.get(m.key);
+      m.el.style.visibility = b ? '' : 'hidden';
+      // Marker의 지형 가림 처리가 루트 opacity를 갱신하므로 글자에 적용한다.
+      m.name.style.opacity = opacity;
+      if (!b) continue;
+      const r = m.el.getBoundingClientRect();
+      m.name.style.transform = `translate(${b[0] - r.left + bounds.left}px, ${b[1] - r.top + bounds.top}px)`;
+    }
   }
 
   layoutLabels() {
@@ -296,6 +339,8 @@ class TerrainMap {
       m.el.style.setProperty('--leader-length', m.region ? '0px' : Math.hypot(dx, dy) + 'px');
       m.el.style.setProperty('--leader-angle', Math.atan2(dy, dx) + 'rad');
     }
+    this.layoutContextLabels(bounds, [...positions.values()].filter(Boolean).concat(
+      visible.filter(m => !m.region).map(m => [m.x - 6, m.y - 6, m.x + 6, m.y + 6])), visible);
   }
 
   fit(animate = true) {
@@ -335,6 +380,7 @@ class TerrainMap {
     this.disposed = true;
     clearTimeout(this.timer);
     this.markers.forEach(m => m.marker.remove());
+    this.contextMarkers.forEach(m => m.marker.remove());
     this.map.remove();
   }
 }

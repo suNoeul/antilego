@@ -105,14 +105,14 @@
   <div id="grip" class="grip" aria-hidden="true"><span></span></div>
   <div class="panel-in">
     <div id="map-wrap" class="map-wrap">
-      <svg id="map" class="panel-map"></svg>
+      <svg id="map" class="panel-map" aria-describedby="region-context-note"></svg>
       <div id="terrain-map" class="terrain-map" aria-hidden="true" inert></div>
       <span id="era-badge" class="era-badge" hidden>대략</span>
       <div class="zoom-ctl">
         <button id="z-terrain" class="zbtn zbtn-txt" type="button" aria-pressed="false"
                 aria-controls="terrain-map" disabled>지형 보기</button>
         <button id="z-era" class="zbtn zbtn-txt" type="button" aria-pressed="false"
-                aria-label="시대 영역 표시">시대</button>
+                aria-label="시대 영역 표시" title="대략적인 시대 영역 표시 · 배경 이름은 기본 표시">시대</button>
         <button id="z-in" class="zbtn" type="button" aria-label="확대">+</button>
         <button id="z-out" class="zbtn" type="button" aria-label="축소">−</button>
         <button id="z-reset" class="zbtn" type="button" aria-label="원래대로">⟲</button>
@@ -122,6 +122,7 @@
       <p id="terrain-status" role="status">현대 지형 참고 · 고대 지형 복원 아님</p>
       <button id="map-mode" type="button">간단 지도</button>
     </div>
+    <p id="region-context-note" class="region-context-note" hidden>옅은 이름은 나라·지역의 대략적 위치이며, 국경·지배 범위가 아닙니다.</p>
     <div id="terrain-note" class="terrain-note" hidden>
       <p class="terrain-help"><span class="terrain-help-touch">두 손가락을 함께 위아래로 · 기울이기</span><span class="terrain-help-mouse">Ctrl + 드래그 · 기울이기 / 회전</span></p>
       <details class="terrain-sources">
