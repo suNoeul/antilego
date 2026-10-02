@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap">
 <link rel="stylesheet" href="styles.css?v=__V__">
+<link rel="stylesheet" href="context-panel.css?v=__V__">
 </head>
 <body>
 
@@ -75,6 +76,9 @@
 <main class="cols">
   <article class="read">
     <h1 id="title" class="title"></h1>
+    <button id="story-entry" class="story-entry" type="button" hidden>삼손 이야기 <span>8장면 따라 읽기 →</span></button>
+    <button id="reading-return" class="reading-return" type="button" hidden></button>
+    <span id="reading-status" class="context-status" role="status"></span>
     <div id="verses" class="verses"></div>
   </article>
 </main>
@@ -104,6 +108,7 @@
 <aside id="panel" class="panel" aria-label="지도 패널">
   <div id="grip" class="grip" aria-hidden="true"><span></span></div>
   <div class="panel-in">
+    <section id="story-block" class="story-block" aria-label="삼손 이야기" hidden></section>
     <div id="map-wrap" class="map-wrap">
       <svg id="map" class="panel-map" aria-describedby="region-context-note"></svg>
       <div id="terrain-map" class="terrain-map" aria-hidden="true" inert></div>
@@ -122,6 +127,11 @@
       <p id="terrain-status" role="status">현대 지형 참고 · 고대 지형 복원 아님</p>
       <button id="map-mode" type="button">간단 지도</button>
     </div>
+    <div id="place-block" class="place-block"></div>
+    <div id="era-caption" class="era-caption" hidden></div>
+    <p id="era-empty" class="era-empty" hidden>이 장은 시대를 특정하지 않아 영역을 표시하지 않습니다</p>
+    <details class="map-details">
+      <summary>지도 안내와 출처</summary>
     <p id="region-context-note" class="region-context-note" hidden>옅은 이름은 나라·지역의 대략적 위치이며, 국경·지배 범위가 아닙니다.</p>
     <div id="terrain-note" class="terrain-note" hidden>
       <p class="terrain-help"><span class="terrain-help-touch">두 손가락을 함께 위아래로 · 기울이기</span><span class="terrain-help-mouse">Ctrl + 드래그 · 기울이기 / 회전</span></p>
@@ -133,10 +143,8 @@
         <p>ASTER GDEM courtesy of METI and NASA, processed by 4cast LTD using VTbuilder. TINITALY © INGV, CC BY 4.0. 해안선·강·호수: Natural Earth (Public Domain).</p>
       </details>
     </div>
-    <p id="era-empty" class="era-empty" hidden>이 장은 시대를 특정하지 않아 영역을 표시하지 않습니다</p>
-    <div id="place-block" class="place-block"></div>
-    <div id="era-caption" class="era-caption" hidden></div>
     <p id="panel-attr" class="panel-attr"></p>
+    </details>
   </div>
 </aside>
 

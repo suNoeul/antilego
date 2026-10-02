@@ -5,6 +5,8 @@ import { renderScene, clampView, zoomAt, sceneFrame, BASE_VIEW, DEF_W, DEF_H }
 // 권 경계 이동과 해시 검증은 DOM 없는 순수 함수로 뺐다 (06-b, 리뷰 F3·F10).
 import { stepRef, isValidRef } from './nav.js?v=__V__';
 import { regionLabels } from './region-labels.js?v=__V__';
+import { createContextPanel, renderEraCaption } from './context-panel.js?v=__V__';
+import { createReadingTrail } from './reading-context.js?v=__V__';
 
 // 배포 버전. GitHub Pages 워크플로가 __V__ 를 커밋 SHA 앞 7자리로 바꾼다.
 // 로컬에서는 바뀌지 않은 채로도 그냥 동작한다 (그냥 쿼리 문자열이다).
@@ -48,6 +50,61 @@ const state = {
   pendingVerse: null,                            // 성경 찾기에서 고른 절 (장 이동 후 스크롤)
 };
 const NO_REGIONS = [];
+
+// 탐색 중 임시 왕복만 기억한다. 새로 실행할 때 절을 복원하는 저장 기능은 아니다.
+let contextNavigation = null, contextNavigationId = 0;
+const readingTrail = createReadingTrail({
+  capture: () => ({ book: state.book, ch: state.ch, p: state.sel, y: window.scrollY,
+    view: { ...state.view }, verse: Number(document.querySelector('.verse-link[aria-pressed="true"]')?.dataset.verse) || null,
+    camera: terrainActive() ? { center: terrain.map.getCenter().toArray(), zoom: terrain.map.getZoom(),
+      pitch: terrain.map.getPitch(), bearing: terrain.map.getBearing() } : null }),
+  navigate: ref => navigateContext(ref),
+  restore: saved => { contextPanel.stopStory(); navigateContext(saved, saved); },
+  changed: origin => {
+    $('reading-return').hidden = !origin;
+    $('reading-return').textContent = origin ? `← 읽던 곳으로 · ${bookOf(origin.book)?.ko || origin.book} ${origin.ch}장` : '';
+  },
+});
+const contextPanel = createContextPanel({
+  root: $('place-block'), storyRoot: $('story-block'), storyEntry: $('story-entry'),
+  getState: () => state, loadReferences: () => getJSON('place-refs.json'),
+  visit: ref => readingTrail.visit(ref),
+  select: (id, verse) => { contextPanel.setVerse(verse); go(state.book, state.ch, id); },
+  layout: () => scheduleRelayout(),
+});
+$('reading-return').addEventListener('click', () => readingTrail.back());
+
+function navigateContext(ref, restore = null) {
+  state.pendingVerse = null;
+  contextNavigation = { ...ref, restore, ticket: ++contextNavigationId, hash: `#${ref.book}.${ref.ch}${ref.p ? '/' + ref.p : ''}` };
+  if (!state.open) setPanel(true);
+  if (location.hash === contextNavigation.hash) finishContextNavigation();
+  else go(ref.book, ref.ch, ref.p);
+}
+function finishContextNavigation() {
+  const nav = contextNavigation;
+  if (!nav || nav.hash !== location.hash || state.book !== nav.book || state.ch !== nav.ch) return;
+  if (!state.data || state.data.book !== nav.book || state.data.chapter !== nav.ch) return;
+  contextNavigation = null;
+  contextPanel.setVerse(nav.restore?.verse || nav.v); contextPanel.update();
+  requestAnimationFrame(() => {
+    if (location.hash !== nav.hash || contextNavigation || contextNavigationId !== nav.ticket) return;
+    if (nav.restore) {
+      state.view = { ...nav.restore.view };
+      if (terrainActive() && nav.restore.camera) terrain.map.jumpTo(nav.restore.camera);
+      else drawMap();
+      window.scrollTo(0, nav.restore.y);
+      $('reading-status').textContent = `${bookOf(nav.book)?.ko || nav.book} ${nav.ch}장, 읽던 곳으로 돌아왔습니다.`;
+      const target = document.querySelector(`.verse[data-v="${nav.restore.verse}"] .place`);
+      (target || $('loc')).focus({ preventScroll: true });
+    } else if (state.data && scrollToVerse(nav.v)) {
+      $('reading-status').textContent = `${bookOf(nav.book)?.ko || nav.book} ${nav.ch}장 ${nav.v}절로 이동했습니다.`;
+      const el = document.querySelector(`.verse[data-v="${nav.v}"]`);
+      const bottom = innerWidth < 900 && state.open ? $('panel').getBoundingClientRect().top : innerHeight;
+      window.scrollBy(0, el.getBoundingClientRect().top - Math.max(64, (bottom - el.offsetHeight + 48) / 2));
+    }
+  });
+}
 
 // 지형은 패널을 처음 열 때만 로드한다. 실패해도 기존 SVG·본문은 독립적으로 동작한다.
 let terrain = null, terrainStarting = false, terrainFailed = false;
@@ -354,6 +411,7 @@ function parseHash() {
 }
 function go(book, ch, sel) {
   const h = '#' + book + '.' + ch + (sel ? '/' + sel : '');
+  if (contextNavigation && contextNavigation.hash !== h) contextNavigation = null;
   if (location.hash === h) return;
   location.hash = h;
 }
@@ -411,7 +469,10 @@ function mapSize() {
   svg.style.width = '';                       // 먼저 풀어야 패널 폭을 다시 잰다
   svg.style.height = '';
   const w = Math.max(160, Math.round(svg.clientWidth) || DEF_W);
-  const h = Math.max(120, Math.round(Math.min(w * 0.75, window.innerHeight * 0.7)));
+  // 이야기 조작부와 지도 버튼이 모바일 시트에 함께 들어오도록 데모에서만 높이를 줄인다.
+  const storyRoom = innerWidth < 900 && !$('story-block').hidden
+    ? Math.max(160, $('panel').clientHeight - $('story-block').offsetHeight - 70) : Infinity;
+  const h = Math.max(120, Math.round(Math.min(w * 0.75, window.innerHeight * 0.7, storyRoom)));
   svg.style.width = w + 'px';
   svg.style.height = h + 'px';
   return [w, h];
@@ -536,27 +597,11 @@ function renderPanel(animate = false) {
   drawMap();
   fitFocus(animate);   // 화면 밖의 선택만 배율을 유지하며 이동한다
   renderEra();
-  const box = $('place-block');
-  box.textContent = '';
-  const p = state.sel && state.places[state.sel];
-  if (p) {
-    const chN = (state.data?.places || []).find(x => x.p === state.sel)?.n || 0;
-    box.insertAdjacentHTML('beforeend',
-      '<p class="card-name"></p><p class="card-en"></p><p class="card-n"></p>');
-    box.querySelector('.card-name').textContent = p.ko || state.sel;
-    box.querySelector('.card-en').textContent = p.en || '';
-    box.querySelector('.card-n').textContent =
-      `이 장에서 ${chN}회 · 성경 전체 ${p.n ?? '?'}회`;
-  } else {
-    const hint = document.createElement('p');
-    hint.className = 'card-hint';
-    hint.textContent = '지명을 누르면 위치를 보여줍니다';
-    box.append(hint);
-  }
+  contextPanel.update();
 }
 
 // --- 시대 캡션 · 영역 레이어 UI (Spike 03-d) ---
-// 캡션은 인라인 한 줄이다: 시대명 · 연대 — 캡션 (대략적인 구분)
+// 시대명·연대는 요약하고 상세 캡션은 접어 둔다 (Spike 11).
 // undated/primeval 이거나 데이터를 못 받았으면 **아무것도 띄우지 않는다**.
 // "시대 불특정"이라고 쓰는 것보다 안 쓰는 게 낫다 (AGENTS.md 원칙).
 function renderEra() {
@@ -564,44 +609,7 @@ function renderEra() {
   const era = eraOf(state.book, state.ch);
   const regions = regionsOf(era);
 
-  cap.textContent = '';
-  const show = !!era && !era.undated;
-  cap.hidden = !show;
-  if (show) {
-    const line = document.createElement('p');
-    line.className = 'era-line';
-    const name = document.createElement(era.note ? 'button' : 'span');
-    name.className = 'era-name';
-    name.textContent = era.ko;
-    if (era.note) {
-      name.type = 'button';
-      name.setAttribute('aria-expanded', 'false');
-      name.setAttribute('aria-controls', 'era-note');
-    }
-    line.append(name);
-    const add = (cls, text) => {
-      const n = document.createElement('span');
-      if (cls) n.className = cls;
-      n.textContent = text;
-      line.append(n);
-    };
-    if (era.approx) { add(null, ' · '); add('era-date', era.approx); }
-    if (era.caption) { add(null, ' — '); add('era-text', era.caption); }
-    add('era-approx', ' (대략적인 구분)');
-    cap.append(line);
-    if (era.note) {
-      const note = document.createElement('p');
-      note.className = 'era-note';
-      note.id = 'era-note';
-      note.hidden = true;                       // 기본 접힘
-      note.textContent = era.note;
-      cap.append(note);
-      name.addEventListener('click', () => {
-        note.hidden = !note.hidden;
-        name.setAttribute('aria-expanded', String(!note.hidden));
-      });
-    }
-  }
+  renderEraCaption(cap, era);
 
   // 레이어를 켰을 때만: 지도 왼쪽 위 `대략` 배지, 그리고 그릴 영역이 없으면 한 줄 안내.
   // 시대 데이터를 못 받았으면 둘 다 띄우지 않는다 — 이유가 다른 안내를 대신 띄우지 않는다.
@@ -768,6 +776,8 @@ async function reloadChapter() {
   await loadChapter(token);
   if (stale(token)) return;
   applySel();
+  contextPanel.update();
+  finishContextNavigation();
 }
 
 // --- 상단바 ---
@@ -809,6 +819,10 @@ async function apply() {
     return;
   }
   const changed = r.book !== state.book || r.ch !== state.ch;
+  if (contextNavigation?.hash !== location.hash) {
+    contextNavigation = null;
+    if (changed) contextPanel.stopStory();
+  }
   state.book = r.book; state.ch = r.ch;
   state.sel = r.sel;
 
@@ -833,6 +847,8 @@ async function apply() {
     state.pendingVerse = null;
     requestAnimationFrame(() => scrollToVerse(v));
   }
+  contextPanel.update();
+  finishContextNavigation();
 }
 
 // --- 지도 조작 (휠·드래그·핀치·더블클릭) ---
@@ -1917,6 +1933,7 @@ async function boot() {
     const b = e.target.closest?.('.place');
     if (!b) return;
     const on = b.dataset.p === state.sel;       // 같은 지명 → 선택 해제
+    contextPanel.setVerse(Number(b.closest('.verse')?.dataset.v));
     go(state.book, state.ch, on ? null : b.dataset.p);
     if (!state.open) setPanel(true, true, b);   // 지명을 누르면 패널이 열린다
   });

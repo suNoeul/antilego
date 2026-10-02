@@ -1,7 +1,7 @@
 // 전용 Chrome 9222 + web/ 서버 8765. 실제 DEM(읽기 전용)만 외부 접근한다.
 import { connect, evalJs, sleep, metrics, clickSel, shot } from '../../07-picker-verse-nav/verify/cdp.mjs';
 import { join } from 'node:path';
-const c = await connect();
+const c = await connect(Number(process.env.CDP_PORT || 9222));
 let count = 0, blockDem = false;
 const failures = [], requests = [], transferred = new Map();
 const check = (v, label) => { count++; console.log(`${v ? 'PASS' : 'FAIL'} | ${label}`); if (!v) failures.push(label); };

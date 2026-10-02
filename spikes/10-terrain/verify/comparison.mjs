@@ -1,7 +1,7 @@
 // 지명 비교 회귀: 전용 Chrome 9222, web/ 서버 8765. 실제 DEM만 외부 요청.
 import { connect, evalJs, sleep, metrics, clickSel, shot } from '../../07-picker-verse-nav/verify/cdp.mjs';
 import { join } from 'node:path';
-const c = await connect();
+const c = await connect(Number(process.env.CDP_PORT || 9222));
 const js = code => evalJs(c, code);
 let total = 0;
 const failures = [];

@@ -1,7 +1,7 @@
 // 전용 Chrome 9222 + web/ 서버 8765. 지도 타일만 실제 네트워크, 외부 폰트/API는 대체.
 import { connect, evalJs, sleep, metrics, clickSel, shot } from '../../07-picker-verse-nav/verify/cdp.mjs';
 import { join } from 'node:path';
-const c = await connect(), failures = [];
+const c = await connect(Number(process.env.CDP_PORT || 9222)), failures = [];
 let count = 0, blockEra = false;
 const js = code => evalJs(c, code);
 const check = (v, label) => { count++; console.log(`${v ? 'PASS' : 'FAIL'} | ${label}`); if (!v) failures.push(label); };

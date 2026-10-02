@@ -1,0 +1,57 @@
+/* 읽기를 돕는 각주: 새 색·아이콘·카드 테두리 대신 여백과 작은 타이포 계층. */
+.place-block { padding: 18px 0 12px; }
+.place-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; }
+.place-heading .card-name { margin: 0; font: 600 20px/1.5 var(--serif); }
+.place-heading .card-en { margin: 0; font-size: 11px; }
+.place-block .card-n { margin: 3px 0 14px; font-size: 11px; }
+.context-row { display: flex; align-items: baseline; gap: 12px; margin: 4px 0; }
+.context-label-title { flex: 0 0 56px; color: var(--muted); font-size: 11px; }
+.context-links { display: flex; flex-wrap: wrap; gap: 0 12px; }
+.verse-link, .place-link, .context-text-button, .reference-link {
+  appearance: none; border: 0; background: transparent; color: var(--accent);
+  font: 12px/1.5 var(--sans); padding: 8px 0; cursor: pointer; text-align: left;
+  text-underline-offset: 5px;
+}
+.verse-link:hover, .place-link:hover, .context-text-button:hover, .reference-link:hover { text-decoration: underline; }
+.verse-link[aria-pressed="true"], .place-link[aria-pressed="true"] { color: var(--ink); text-decoration: underline; }
+.context-text-button:disabled { opacity: .35; cursor: default; text-decoration: none; }
+.context-more { margin-top: 12px; border-top: 1px solid var(--line); }
+.context-more summary, .map-details > summary, .era-details > summary {
+  padding: 12px 0; color: var(--muted); font: 11px/1.6 var(--sans); cursor: pointer;
+}
+.context-more summary:hover, .map-details > summary:hover, .era-details > summary:hover { color: var(--ink); }
+.other-references { display: flex; flex-wrap: wrap; column-gap: 14px; padding-bottom: 10px; }
+.other-references .context-note { flex-basis: 100%; }
+.context-note { margin: 2px 0 6px; color: var(--muted); font: 11px/1.7 var(--sans); }
+.more-references { flex-basis: 100%; }
+.era-caption { margin: 0; opacity: 1; border-top: 1px solid var(--line); }
+.era-details .era-name { font: inherit; color: var(--ink); cursor: inherit; }
+.era-details .era-date { font-weight: 400; }
+.era-details p { margin: 0 0 12px; font-size: 12px; line-height: 1.8; }
+.map-details { border-top: 1px solid var(--line); }
+.map-details .panel-attr { border: 0; padding-top: 0; }
+.story-entry { display: block; margin: -8px 0 24px; padding: 8px 0; border: 0; background: none;
+  color: var(--ink); font: 12px/1.6 var(--sans); cursor: pointer; scroll-margin-top: calc(var(--topbar-h) + 16px); }
+.story-entry span { color: var(--muted); margin-left: 10px; }
+.story-entry:hover span { color: var(--accent); }
+.story-block { margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.story-head, .story-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.context-eyebrow { color: var(--muted); font: 10px/1.5 var(--sans); letter-spacing: .06em; }
+.story-head .context-text-button { color: var(--muted); font-size: 11px; }
+.story-title { margin: 5px 0; font: 600 17px/1.6 var(--serif); }
+.story-note { color: var(--ink); margin: 0 0 4px; font: 12px/1.7 var(--sans); }
+.story-limit { margin: 2px 0 0; color: var(--muted); font: 10px/1.6 var(--sans); }
+.reading-return { position: sticky; top: var(--topbar-h); z-index: 25;
+  display: block; width: 100%; margin: 0 0 16px; padding: 12px 0; text-align: left;
+  border: 0; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--accent);
+  font: 12px/1.5 var(--sans); cursor: pointer; }
+.story-entry[hidden], .story-block[hidden], .reading-return[hidden] { display: none; }
+.context-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.context-text-button:focus-visible, .verse-link:focus-visible, .place-link:focus-visible,
+.reference-link:focus-visible, .story-entry:focus-visible, .reading-return:focus-visible,
+.context-more summary:focus-visible, .map-details summary:focus-visible, .era-details summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px;
+}
+@media (pointer: coarse) {
+  .verse-link, .place-link, .reference-link, .context-text-button { min-height: 40px; }
+}

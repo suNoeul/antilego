@@ -5,6 +5,14 @@ on:
     branches: [main]
     paths:
       - 'web/**'
+      - 'spikes/**'
+      - 'data/derived/places.ko.overrides.json'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'spikes/**'
+      - 'data/derived/places.ko.overrides.json'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -13,11 +21,28 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Test data, reading, maps and accessibility
+        run: node spikes/11-reading-context/verify/run.mjs
+
   build:
+    needs: verify
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,7 +57,7 @@ jobs:
       - name: Stamp version (__V__ → commit SHA)
         run: |
           V="${GITHUB_SHA::7}"
-          sed -i "s/__V__/$V/g" web/index.html web/app.js web/map.js web/terrain.js
+          sed -i "s/__V__/$V/g" web/index.html web/app.js web/map.js web/terrain.js web/context-panel.js
           echo "version = $V"
           grep -o 'app\.js?v=[0-9a-f]*' web/index.html
       - name: Upload artifact (web/ only)

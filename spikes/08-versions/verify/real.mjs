@@ -120,7 +120,7 @@ ok('ESV: 지도에 이 장 지명이 그대로 있다',
 ok('ESV: 카드의 `이 장에서 N회`', await evalJs(cdp, `
   document.querySelector('.verse[data-v="1"] .place').click();
   await new Promise(r => setTimeout(r, 400));
-  return document.querySelector('.card-n').textContent;`), '이 장에서 22회 · 성경 전체 50회');
+  return document.querySelector('.card-n').textContent;`), '이 장 22회 · 성경 전체 50회');
 await shot(cdp, `${SHOTS}/b-real-esv.png`);
 
 // --- 5. 역본을 유지한 채 장을 옮긴다 ---
